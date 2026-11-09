@@ -29,3 +29,12 @@ db.transactions.countDocuments({ attempts: { $exists: true } })
 
 // Taille moyenne d'une ligne de ledger de wallet (octets)
 db.ledger_entries.aggregate([{ $match: { walletId: { $ne: null } } }, { $group: { _id: null, octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } } } }])
+
+// ===== Complément (session du 9 novembre 2026, 19:15 UTC) : annulations et écriture inverse =====
+// Nombre de transactions annulées
+db.transactions.countDocuments({ status: "REVERSED" })
+// Les transactions à 4 ou 6 lignes de ledger, et leur statut.
+// On part du ledger (regroupé par txId) pour joindre transactions par _id, qui est indexé.
+db.ledger_entries.aggregate([{ $group: { _id: "$txId", lignes: { $sum: 1 } } }, { $match: { lignes: { $in: [4, 6] } } }, { $lookup: { from: "transactions", localField: "_id", foreignField: "_id", as: "t" } }, { $unwind: "$t" }, { $group: { _id: { statut: "$t.status", lignes: "$lignes" }, transactions: { $sum: 1 } } }, { $sort: { "_id.lignes": 1 } }])
+// Exemple détaillé : les lignes de ledger d'une transaction annulée, dans l'ordre chronologique
+db.ledger_entries.find({ txId: "T0002044" }, { _id: 0, txId: 1, walletId: 1, account: 1, direction: 1, amount: 1, balanceAfter: 1, createdAt: 1 }).sort({ createdAt: 1 })

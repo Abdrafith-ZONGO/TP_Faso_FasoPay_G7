@@ -1,3 +1,4 @@
 # Erreurs de l'outil IA corrigées (annexe E)
 
-1. Partie 1 : l'outil a d'abord donné des chiffres (lignes de ledger par transaction, transactions par marchand, etc.) calculés sur les fichiers, pas sur le serveur. J'ai exigé de les mesurer moi-même dans mongosh ; ils sont maintenant dans preuves/01-mesures-modelisation.txt.
+1. Partie 2, E3 : l'outil a fourni une requête de courbe de Pareto qui a échoué sur notre serveur (erreur `$documentNumber must be specified with a top level sortBy expression with exactly one element`), parce qu'elle triait sur deux champs. Nous avons refait la session après correction (tri sur `ca` seul, avec un contrôle que les 150 CA sont distincts).
+2. (en réserve) Partie 0 : l'outil nous a fait taper Object.bsonsize(), fonction qui n'existe pas dans mongosh 2.14.0 (TypeError dans preuves/00-dimensionnement.txt) ; nous avons refait la mesure avec $bsonSize dans un pipeline d'agrégation.

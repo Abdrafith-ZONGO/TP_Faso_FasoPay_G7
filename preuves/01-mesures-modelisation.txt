@@ -57,3 +57,82 @@ rs0 [direct: primary] fasopay_tp> db.transactions.countDocuments({ attempts: { $
 rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { walletId: { $ne: null } } }, { $group: { _id: null,octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } } } }])
 [ { _id: null, octetsMoyens: 134.39663351185922 } ]
 rs0 [direct: primary] fasopay_tp> 
+=== Complément Partie 1 : transactions REVERSED et écriture inverse dans le ledger (règle « ajout seul ») ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 19:15:21 UTC 2026
+Current Mongosh Log ID: 6af21bcba8b7b9ef1ea86e34
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> db.transactions.countDocuments({ status: "REVERSED" })
+280
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $group: { _id: "$txId", lignes: { $sum: 1 } } }, { $match: { lignes: { $in: [4, 6] } } }, { $lookup: { ffrom: "transactions", localField: "_id", foreignField: "_id", as: "t" } }, { $unwind: "$t" }, { $group: { _id: { statut: "$t.status", lignes: "$lignes" }, transactions:{ $sum: 1 } } }, { $sort: { "_id.lignes": 1 } }])
+[
+  { _id: { statut: 'REVERSED', lignes: 4 }, transactions: 121 },
+  { _id: { statut: 'REVERSED', lignes: 6 }, transactions: 159 }
+]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.find({ txId: "T0002044" }, { _id: 0, txId: 1, walletId: 1, account: 1, direction: 1, amount: 1, balanceAfter: 1, creacreatedAt: 1 }).sort({ createdAt: 1 })
+[
+  {
+    txId: 'T0002044',
+    walletId: null,
+    account: 'FEES',
+    direction: 'CREDIT',
+    amount: 196,
+    createdAt: ISODate('2026-01-01T07:02:26.116Z')
+  },
+  {
+    txId: 'T0002044',
+    walletId: 'W000344',
+    direction: 'DEBIT',
+    amount: 9325,
+    balanceAfter: 171400,
+    createdAt: ISODate('2026-01-01T07:02:26.116Z')
+  },
+  {
+    txId: 'T0002044',
+    walletId: null,
+    account: 'MERCHANT:M00044',
+    direction: 'CREDIT',
+    amount: 9129,
+    createdAt: ISODate('2026-01-01T07:02:26.116Z')
+  },
+  {
+    txId: 'T0002044',
+    walletId: null,
+    account: 'MERCHANT:M00044',
+    direction: 'DEBIT',
+    amount: 9129,
+    createdAt: ISODate('2026-01-01T07:03:04.153Z')
+  },
+  {
+    txId: 'T0002044',
+    walletId: null,
+    account: 'FEES',
+    direction: 'DEBIT',
+    amount: 196,
+    createdAt: ISODate('2026-01-01T07:03:04.153Z')
+  },
+  {
+    txId: 'T0002044',
+    walletId: 'W000344',
+    direction: 'CREDIT',
+    amount: 9325,
+    balanceAfter: 180725,
+    createdAt: ISODate('2026-01-01T07:03:04.153Z')
+  }
+]
+rs0 [direct: primary] fasopay_tp> exit

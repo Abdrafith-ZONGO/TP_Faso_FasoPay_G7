@@ -1,6 +1,6 @@
 # 1. Contexte et problématique
 
-## Mon jeu de données (groupe 07)
+## Notre jeu de données (groupe 07)
 Paramètres : 2000 clients, 150 marchands, 60 000 transactions, du 2026-01-01 sur 181 jours. Empreinte du jeu (`datasetSha256`, début) : `9b0b9a40…`.
 
 | Grandeur | Attendu (`fingerprint.json`) | Obtenu (`preuves/00-fingerprint.txt`) |
@@ -16,7 +16,9 @@ Paramètres : 2000 clients, 150 marchands, 60 000 transactions, du 2026-01-01 su
 
 Les cinq empreintes SHA-256 complètes des fichiers NDJSON sont conformes à `fingerprint.json` (`preuves/00-fingerprint.txt`). Les types ont été vérifiés après l'import (`preuves/00-types.txt`) : montants en `int`, dates en `date`, seul `feePct` en `double` (un pourcentage).
 
-## Mon environnement
+Le jeu commence par **2 000 dépôts d'ouverture** (`CASH_IN`, `COMPLETED`) le 2025-12-31, un par wallet, pour 707 172 575 FCFA ; chacun a deux lignes de ledger (un crédit du wallet, un débit hors wallet du même montant). Viennent ensuite 58 000 transactions du 2026-01-01 au 2026-06-30 (181 jours, paramètres du `fingerprint.json`). Preuve : dernier bloc de `preuves/02-enquete.txt`.
+
+## Notre environnement
 Windows, Docker 29.8.0, MongoDB 8.0.34 (image `mongo:8.0`), mongosh 2.14.0. Mémoire visible par Docker : 8 170 151 936 octets (environ 8,17 Go). Replica Set `rs0` à un nœud, PRIMARY (`preuves/00-rs-status-1-noeud.txt`). Commandes complètes en annexe B.
 
 ## Pourquoi un Replica Set, même à un nœud

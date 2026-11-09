@@ -486,6 +486,22 @@ Résultat : 1 wallet par client (2000 clients) ; 2 à 6 lignes de ledger par tra
 
 Remarque : dans la sortie brute conservée, certains mots s'affichent déformés (par exemple `$co$cond`). C'est un défaut d'affichage du terminal : les requêtes tapées étaient correctes et les résultats sont valides.
 
+### 13.1 Complément : annulations et écriture inverse
+
+Objectif : vérifier comment nos données représentent une annulation. Les transactions à 4 et 6 lignes de ledger sont-elles les transactions `REVERSED`, et leurs lignes d'origine sont-elles conservées, avec des lignes inverses ajoutées ? Ce sont des lectures : aucune donnée n'est modifiée.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+Les requêtes tapées dans la session sont rangées, commentées, dans `code/01-mesures-modelisation.js` (bloc Complément).
+
+Résultat : 280 transactions `REVERSED` ; les transactions à 4 lignes (121) et à 6 lignes (159) sont toutes `REVERSED`, et aucun autre statut n'a 4 ou 6 lignes. Exemple T0002044 (paiement marchand de 9325 FCFA, frais 196) : les 3 lignes d'origine (débit du wallet W000344, crédit du marchand M00044 de 9129, crédit des frais de 196) sont conservées, puis 3 lignes inverses de mêmes montants sont ajoutées 38 secondes plus tard ; le solde du wallet passe de 171400 à 180725 (+9325). Preuve : dernier bloc de `preuves/01-mesures-modelisation.txt` (date `Mon Nov  9 19:15:21 UTC 2026`).
+
+Remarque : dans la sortie brute conservée, l'écho des commandes affiche `ffrom` et `creacreatedAt` ; c'est le défaut d'affichage habituel du terminal, les résultats sont corrects.
+
 ## 14. Enquête (Partie 2)
 
 ### 14.1 E1 : wallets dont le solde diffère du ledger
@@ -503,3 +519,139 @@ Les requêtes tapées dans la session sont rangées, commentées, dans `code/02-
 Résultat : 6 wallets sur 2000 ont un solde différent du ledger ; écart net −69000, écart absolu 138000 (écart = balance moins ledger). Le ledger signé totalise 832320836 pour les wallets, contre 832251836 pour les soldes (`walletsBalanceTotal` du fingerprint) : la différence est 69000. Pour ces 6 wallets, la dernière valeur `balanceAfter` du ledger est égale à la somme du ledger. Preuve enregistrée dans `preuves/02-enquete.txt` (bloc E1, date `Sun Nov  8 23:27:03 UTC 2026`).
 
 Remarque : dans la sortie brute conservée, certains mots s'affichent déformés dans l'écho des commandes (par exemple `$co$cond`, `liglignes`, `$$count`). C'est un défaut d'affichage du terminal : les requêtes tapées étaient correctes et les résultats portent les bons noms de champs.
+
+### 14.2 E2 : clients qui découpent leurs transferts sous le plafond
+
+Objectif : repérer les wallets qui contournent leur plafond journalier `dailyLimit` en découpant leurs sorties d'argent en plusieurs transactions juste en dessous. Critère retenu : un wallet est suspect un jour donné (UTC) s'il émet au moins 3 transactions `COMPLETED` de type `P2P` ou `CASH_OUT`, chacune comprise entre 90 % et 100 % de son plafond. Ce sont des lectures : aucune donnée n'est modifiée.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+Les requêtes tapées dans la session sont rangées, commentées, dans `code/02-enquete.js` (bloc E2) : couples wallet-jour suspects, résumé par wallet, identité des clients, cas détaillé de W000758 le 30 janvier 2026, puis trois contrôles de solidité du critère.
+
+Résultat : 5 wallets (W000214, W000758, W001070, W001218, W001322) totalisent 23 couples wallet-jour suspects et 121 transactions. Cas détaillé : W000758 le 2026-01-30, 7 transactions entre 08:25 et 11:21 UTC, de 181850 à 191975, soit 1320325 pour un plafond de 200000. Contrôles : sur 46495 sorties, aucune ne dépasse le plafond à elle seule ; les 121 transactions comprises entre 90 % et 100 % du plafond, tous types et statuts confondus, sont 73 `P2P` et 48 `CASH_OUT`, toutes `COMPLETED`, et appartiennent aux mêmes 5 wallets ; avec un seuil de 50 % ou de 70 %, on retrouve les mêmes 5 wallets. Preuve enregistrée dans `preuves/02-enquete.txt` (bloc E2, date `Mon Nov  9 02:47:20 UTC 2026`).
+
+Remarque : dans la sortie brute conservée, certains mots s'affichent déformés dans l'écho des commandes (par exemple `$g$gte`, `cucustomerId`, `$$lt`). C'est un défaut d'affichage du terminal : les requêtes tapées étaient correctes et les résultats portent les bons noms de champs.
+
+### 14.3 E3 : marchands qui concentrent le CA (Pareto)
+
+Objectif : mesurer la concentration du chiffre d'affaires par marchand et vérifier si le top 20 % des marchands fait 80 % du CA. Définition retenue : CA d'un marchand = somme des `amount` de ses transactions `MERCHANT_PAY` au statut `COMPLETED` (les `FAILED` et `PENDING` n'ont rien encaissé, les `REVERSED` sont des remboursements, et `fee` est la commission de FasoPay). Ce sont des lectures : aucune donnée n'est modifiée.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+Les requêtes tapées dans la session sont rangées, commentées, dans `code/02-enquete.js` (bloc E3) : paiements marchands par statut, montants COMPLETED par type (rattachement au fingerprint), CA par marchand, dix premiers marchands, contrôle des CA distincts, courbe de Pareto.
+
+Note : une première session E3 s'était arrêtée sur la requête de Pareto (erreur `$documentNumber must be specified with a top level sortBy expression with exactly one element`, tri sur deux champs). La session a été refaite en entier avec la requête corrigée (tri sur `ca` seul, après contrôle que les 150 CA sont distincts) ; seule la session refaite est conservée comme preuve.
+
+Résultat : CA total 229050525 sur 16603 paiements COMPLETED et 150 marchands. Les montants COMPLETED par type totalisent 1946303325, soit `transactionsAmountCompleted` du fingerprint. Le marchand M00130 (École Paspanga) fait 62325425, soit 27,21 % du CA ; les 15 premiers marchands (10 %) font 72,55 % ; les 30 premiers (20 %) font 81,96 %. Preuve enregistrée dans `preuves/02-enquete.txt` (bloc E3, date `Mon Nov  9 03:12:03 UTC 2026`).
+
+Remarque : dans la sortie brute conservée, certains mots s'affichent déformés dans l'écho des commandes (par exemple `$doc$documentNumber`, `docdocuments`, `$r$round`). C'est un défaut d'affichage du terminal : les requêtes tapées étaient correctes et les résultats portent les bons noms de champs.
+
+### 14.4 E4 : clés d'idempotence rejouées et incident
+
+Objectif : identifier les transactions dont la clé d'idempotence a été rejouée (tableau `attempts` : une tentative `PROCESSED`, puis des `REPLAYED`), mesurer les écarts de montant et de statut, et repérer un éventuel incident dans une fenêtre horaire. Ce sont des lectures : aucune donnée n'est modifiée.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+Les requêtes tapées dans la session sont rangées, commentées, dans `code/02-enquete.js` (bloc E4) : une ligne par clé rejouée, totaux, tentatives par jour, fenêtre exacte et répartition horaire de l'incident, puis trois contrôles (unicité des clés, lignes de ledger des transactions rejouées, paiements marchands en double avec des clés différentes).
+
+Résultat : 21 clés rejouées sur 60000, soit 86 tentatives dont 21 traitées et 65 rejeux. Chaque transaction rejouée a une seule tentative `PROCESSED` et un seul document, de statut `COMPLETED` : aucun écart de montant ou de statut. Les 60000 clés sont toutes uniques. Les 21 transactions ont 2 ou 3 lignes de ledger (8 et 13). Le contrôle des paiements marchands en double (même wallet, même marchand, même montant, moins de 10 minutes, clés différentes) ne renvoie aucun résultat. Incident le 2026-04-10, de 14:09:05.877 à 15:36:10.115 UTC (environ 87 minutes) : 10 clés, 46 tentatives dont 36 rejeux (15 tentatives à 14 h, 31 à 15 h), alors que les 11 autres jours en comptent une seule chacun. Le montant qui aurait été payé en double si chaque rejeu avait été exécuté est 633025 (dont 344775 le 10 avril). Preuve enregistrée dans `preuves/02-enquete.txt` (bloc E4, date `Mon Nov  9 03:20:39 UTC 2026`).
+
+Remarque : dans la sortie brute conservée, certains mots s'affichent déformés dans l'écho des commandes (par exemple `amouamount`, `$$group`, `$e$eq`, `dedebut`, `rerejeux`). C'est un défaut d'affichage du terminal : les requêtes tapées étaient correctes et les résultats portent les bons noms de champs. La dernière requête (contrôle des doublons) n'affiche aucune ligne : aucun résultat.
+
+
+### 14.5 Compléments de l'enquête
+
+Objectif : trois vérifications ajoutées après relecture du cours. (1) Les dépôts d'ouverture du 2025-12-31 sont-ils dans le ledger ? (2) E2 et E4 regroupent par jour avec `$dateToString` sans fuseau : le résultat change-t-il avec `timezone: "Africa/Ouagadougou"` ? (3) Le contrôle des doublons de E4 a renvoyé 0 : détecte-t-il vraiment un doublon ? `fasopay_tp` n'est pas modifiée.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+Pour le test de détection, les paiements marchands sont copiés dans une base jetable `fasopay_audit`, un faux doublon y est ajouté, puis la base est supprimée :
+
+```js
+db.transactions.aggregate([{ $match: { type: "MERCHANT_PAY" } }, { $out: { db: "fasopay_audit", coll: "paiements" } }])
+db.getSiblingDB("fasopay_audit").dropDatabase()
+```
+
+Les requêtes tapées dans la session sont rangées, commentées, dans `code/02-enquete.js` (bloc Compléments).
+
+Résultat : 2000 dépôts d'ouverture `CASH_IN` `COMPLETED` le 2025-12-31, un par wallet, pour 707172575 FCFA, avec 2000 crédits de wallet et 2000 débits hors wallet du même montant dans le ledger. Avec le fuseau `Africa/Ouagadougou`, E2 donne toujours 23 couples, 121 transactions et 5 wallets, et E4 les mêmes 12 jours (UTC+0). Le contrôle des doublons renvoie 0 résultat sur les 17989 paiements copiés, puis exactement 1 (`FAUX_DOUBLON`) après l'ajout d'un faux doublon une minute après T0003152 avec une autre clé. La base jetable est supprimée et les comptages de `fasopay_tp` sont inchangés. Preuve : dernier bloc de `preuves/02-enquete.txt` (date `Mon Nov  9 18:24:32 UTC 2026`).
+
+
+## 15. Index et explain (Partie 3)
+
+Objectif : mesurer avec `explain("executionStats")` trois requêtes critiques avant création d'index, créer les index, puis mesurer à nouveau. Les requêtes sont : Q1, les sorties `COMPLETED` d'un wallet sur une journée (contrôle du plafond journalier), Q2, la dernière ligne du ledger d'un wallet (rapprochement avec le solde), Q3, la recherche d'une transaction par `idempotencyKey`. La session mesure aussi le temps de la requête de CA (E3) sans index, pour justifier un index refusé.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+Création des trois index, commandes exactes tapées dans la session :
+
+```js
+db.transactions.createIndex({ fromWalletId: 1, status: 1, createdAt: 1, amount: 1 }, { name: "idx_sorties_wallet_jour" })
+db.ledger_entries.createIndex({ walletId: 1, createdAt: -1 }, { name: "idx_ledger_wallet_date" })
+db.transactions.createIndex({ idempotencyKey: 1 }, { unique: true, name: "uniq_idempotency_key" })
+```
+
+Les requêtes, la fonction de résumé des `explain` et les commandes de mesure sont rangées, commentées, dans `code/03-index.js`.
+
+Résultat : les trois index sont créés. Q1 passe de `COLLSCAN` (60000 documents lus) à `PROJECTION_COVERED > IXSCAN` (7 entrées, 0 document lu), Q2 de `SORT > COLLSCAN` (141939 documents lus) à `LIMIT > FETCH > IXSCAN` (1 entrée, 1 document), Q3 de `COLLSCAN` (60000) à `EXPRESS_IXSCAN` (1 entrée, 1 document). Un doublon d'`idempotencyKey` est refusé (code 11000). Tailles des index : `idx_sorties_wallet_jour` 1028096 octets, `uniq_idempotency_key` 1511424, `idx_ledger_wallet_date` 2158592. Les comptages n'ont pas changé. Preuve enregistrée dans `preuves/03-explain.txt` (date `Mon Nov  9 03:33:59 UTC 2026`).
+
+### 15.1 Complément de la Partie 3
+
+Objectif : compléter les mesures selon la checklist du cours (chapitre 8) : temps sur 3 exécutions avec la médiane, avant et après index ; taille des index avant et après ; un cas où l'index n'aide pas ; l'index refusé mesuré au lieu d'être seulement argumenté. Le « avant » est mesuré sans supprimer les index, en forçant une lecture complète avec `hint({ $natural: 1 })`.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+L'index refusé est créé le temps de la mesure, puis supprimé ; commandes exactes tapées dans la session :
+
+```js
+db.transactions.createIndex({ type: 1, status: 1, merchantId: 1, amount: 1 }, { name: "idx_refuse_ca_marchand" })
+db.transactions.dropIndex("idx_refuse_ca_marchand")
+```
+
+Les autres commandes sont rangées, commentées, dans `code/03-index.js` (bloc Complément).
+
+Résultat : médianes sur 3 exécutions, avant puis après : Q1 19 puis 0 ms, Q2 43 puis 0 ms, Q3 18 puis 0 ms, avec les mêmes plans et compteurs que la session du 9 novembre à 03:33 et le même `nReturned`. Index : `transactions` 2514944 octets avant (seul `_id_`) et 5054464 après, `ledger_entries` 5316608 puis 7475200. Une requête sans `fromWalletId` (premier champ de l'index) reste en `COLLSCAN` : 60000 documents lus pour 575 renvoyés. L'index refusé fait passer E3 de `GROUP > COLLSCAN` (60000 documents, médiane 23 ms) à `GROUP > PROJECTION_COVERED > IXSCAN` (16603 clés, 0 document, médiane 9 ms) pour 610304 octets ; il est ensuite supprimé, et `getIndexes()` ne liste plus que `_id_`, `idx_sorties_wallet_jour` et `uniq_idempotency_key`. Les comptages sont inchangés. Preuve : dernier bloc de `preuves/03-explain.txt` (date `Mon Nov  9 18:46:07 UTC 2026`).
+
+Remarque : dans la sortie brute conservée, l'écho de la commande des tailles affiche `seul_id_` ; la sortie, elle, affiche bien `seul _id_`. C'est le défaut d'affichage habituel du terminal.
+
+## 16. Mesures de dimensionnement (Partie 0)
+
+Objectif : mesurer sur nos données les grandeurs de la feuille de dimensionnement : taille BSON moyenne des documents, taille des données et des index de chaque collection (après les index de la Partie 3), lignes de ledger par transaction, écritures par type de transaction, volume des 30 derniers jours. Ce sont des lectures : aucune donnée n'est modifiée.
+
+Après avoir relevé la date avec `docker exec mongo-rs1 date -u`, ouverture de la session :
+
+```powershell
+docker exec -it mongo-rs1 mongosh fasopay_tp
+```
+
+Les requêtes tapées dans la session sont rangées, commentées, dans `code/00-dimensionnement.js`.
+
+Résultat : taille moyenne 253,02 octets (transactions), 130,19 (ledger), 144 (wallets), sur les collections entières et sur des échantillons de 1000 documents (252,44 et 130,30). Données : 15181339 octets (transactions) et 18479703 (ledger) ; index : 5054464 et 7475200. 2,36565 lignes de ledger et 1,19808 jambes de wallet par transaction. Fenêtre de 30 jours : 9635 transactions et 22728 lignes de ledger. Preuve enregistrée dans `preuves/00-dimensionnement.txt` (date `Mon Nov  9 14:50:22 UTC 2026`).
+
+La dernière commande de cette session (`Object.bsonsize`) a échoué : cette fonction n'existe pas dans mongosh 2.14.0. La mesure de la taille d'un document `outbox` a été refaite dans une seconde session, avec `$bsonSize` dans un pipeline (deuxième bloc de la preuve).
+
+Remarque : dans la sortie brute conservée, certains mots s'affichent déformés dans l'écho des commandes (par exemple `$bso$bsonSize`, `$gro$group`). C'est un défaut d'affichage du terminal : les requêtes tapées étaient correctes et les résultats portent les bons noms de champs.

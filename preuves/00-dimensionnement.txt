@@ -1,0 +1,160 @@
+=== Partie 0 : dimensionnement, mesures sur fasopay_tp ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 14:50:22 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af1ddb74f1aec1b5c87eeb2
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $group: { _id: null, documents: { $sum: 1 }, octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } }, octetsMax: { $max: { $bsonSize: "$$ROOT" } } } }])
+[
+  {
+    _id: null,
+    documents: 60000,
+    octetsMoyens: 253.02231666666665,
+    octetsMax: 568
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $group: { _id: null, documents: { $sum: 1 }, octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } }, octetsMax: { $max: { $bsonSize: "$$ROOT" } } } }])
+[
+  {
+    _id: null,
+    documents: 141939,
+    octetsMoyens: 130.19468222264493,
+    octetsMax: 135
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.wallets.aggregate([{ $group: { _id: null, documents: { $sum: 1 }, octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } }, octetsMax: { $max: { $bso$bsonSize: "$$ROOT" } } } }])
+[ { _id: null, documents: 2000, octetsMoyens: 144, octetsMax: 144 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $sample: { size: 1000 } }, { $group: { _id: null, echantillon: { $sum: 1 }, octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } } } }])
+[ { _id: null, echantillon: 1000, octetsMoyens: 252.444 } ]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $sample: { size: 1000 } }, { $group: { _id: null, echantillon: { $sum: 1 }, octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } } } }])
+[ { _id: null, echantillon: 1000, octetsMoyens: 130.297 } ]
+rs0 [direct: primary] fasopay_tp> ["transactions", "ledger_entries", "wallets", "customers", "merchants"].forEach(function (n) { var s = db[n].stats(); print(n + " : count=" + s.count + " size=" + s.size + " storageSize=" + s.storageSize + " avgObjSize=" + s.avgObjSize + " totalIndexSize=" + s.totalIndexSize); printjson(s.indexSizes) })
+transactions : count=60000 size=15181339 storageSize=7983104 avgObjSize=253 totalIndexSize=5054464
+{
+  _id_: 2514944,
+  idx_sorties_wallet_jour: 1028096,
+  uniq_idempotency_key: 1511424
+}
+ledger_entries : count=141939 size=18479703 storageSize=9265152 avgObjSize=130 totalIndexSize=7475200
+{
+  _id_: 5316608,
+  idx_ledger_wallet_date: 2158592
+}
+wallets : count=2000 size=288000 storageSize=167936 avgObjSize=144 totalIndexSize=110592
+{
+  _id_: 110592
+}
+customers : count=2000 size=304207 storageSize=229376 avgObjSize=152 totalIndexSize=110592
+{
+  _id_: 110592
+}
+merchants : count=150 size=31883 storageSize=53248 avgObjSize=212 totalIndexSize=36864
+{
+  _id_: 36864
+}
+
+rs0 [direct: primary] fasopay_tp> print(db.ledger_entries.countDocuments() + " lignes / " + db.transactions.countDocuments() + " transactions = " + (db.ledger_entries.countDocuments() / db.transactions.countDocuments()))
+141939 lignes / 60000 transactions = 2.36565
+
+rs0 [direct: primary] fasopay_tp> print(db.ledger_entries.countDocuments({ walletId: { $ne: null } }) + " jambes de wallet / " + db.transactions.countDocuments() + " transactions = " + (db.ledger_entries.countDocuments({ walletId: { $ne: null } }) / db.transactions.countDocuments()))
+71885 jambes de wallet / 60000 transactions = 1.1980833333333334
+
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $lookup: { from: "transactions", localField: "txId", foreignField: "_id", as: "t" } }, { $unwind: "$t" }, { $gro$group: { _id: { type: "$t.type", tx: "$txId" }, lignes: { $sum: 1 }, jambesWallet: { $sum: { $cond: [{ $ne: ["$walletId", null] }, 1, 0] } } } }, { $group: { _id: "$_id.type",transactions: { $sum: 1 }, lignesMoyennes: { $avg: "$lignes" }, jambesWalletMoyennes: { $avg: "$jambesWallet" } } }, { $sort: { _id: 1 } }])
+[
+  {
+    _id: 'BILL',
+    transactions: 5207,
+    lignesMoyennes: 3.0167082773189935,
+    jambesWalletMoyennes: 1.005569425772998
+  },
+  {
+    _id: 'CASH_IN',
+    transactions: 13232,
+    lignesMoyennes: 2,
+    jambesWalletMoyennes: 1
+  },
+  {
+    _id: 'CASH_OUT',
+    transactions: 6312,
+    lignesMoyennes: 3,
+    jambesWalletMoyennes: 1
+  },
+  {
+    _id: 'MERCHANT_PAY',
+    transactions: 16733,
+    lignesMoyennes: 3.02330723719596,
+    jambesWalletMoyennes: 1.00776907906532
+  },
+  {
+    _id: 'P2P',
+    transactions: 15000,
+    lignesMoyennes: 2.0161333333333333,
+    jambesWalletMoyennes: 2.0161333333333333
+  }
+]
+rs0 [direct: primary] fasopay_tp> var bornes = db.transactions.aggregate([{ $group: { _id: null, debut: { $min: "$createdAt" }, fin: { $max: "$createdAt" } } }]).toArray()[0]
+
+rs0 [direct: primary] fasopay_tp> bornes
+{
+  _id: null,
+  debut: ISODate('2025-12-31T00:00:39.622Z'),
+  fin: ISODate('2026-06-30T23:44:56.506Z')
+}
+rs0 [direct: primary] fasopay_tp> var coupe = new Date(bornes.fin.getTime() - 30 * 24 * 3600 * 1000)
+
+rs0 [direct: primary] fasopay_tp> coupe
+ISODate('2026-05-31T23:44:56.506Z')
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { createdAt: { $gte: coupe } } }, { $group: { _id: null, transactions: { $sum: 1 }, octets: { $sum: { $bso$bsonSize: "$$ROOT" } } } }])
+[ { _id: null, transactions: 9635, octets: 2436628 } ]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { createdAt: { $gte: coupe } } }, { $group: { _id: null, lignes: { $sum: 1 }, octets: { $sum: { $bsonSiz$bsonSize: "$$ROOT" } } } }])
+[ { _id: null, lignes: 22728, octets: 2959858 } ]
+rs0 [direct: primary] fasopay_tp> Object.bsonsize({ _id: ObjectId(), type: "TRANSFER_COMPLETED", txId: "T0000001", status: "PENDING", createdAt: new Date() })
+TypeError: Object.bsonsize is not a function (Are you trying to run a script written for the legacy shell? Try running `snippet install mongocompat`)
+rs0 [direct: primary] fasopay_tp> exit
+
+=== Partie 0 : taille d'un document outbox (suite de la session précédente : Object.bsonsize n'existe pas dans mongosh) ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 14:57:27 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af1df617671456ca1cee5f8
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> db.wallets.aggregate([{ $limit: 1 }, { $project: { _id: 0, octetsOutbox: { $bsonSize: { _id: ObjectId(), type: "TRANSFER_COMPLETED", txId: "T0000001", status: "PENDING", createdAt: new Date() } } } }])
+[ { octetsOutbox: 109 } ]
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 

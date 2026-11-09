@@ -1,0 +1,1086 @@
+=== Partie 3 : explain avant / après index (JSON mongosh) ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 03:33:59 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af13f2ab974af1ba2a47d74
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> var q1 = function () { return db.transactions.find({ fromWalletId: "W000758", status: "COMPLETED", createdAt: { $gte: ISODate("2026-01-30T00:00:00Z"), $lt: ISODate("2026-01-31T00:00:00Z") } }, { amount: 1, _id: 0 }) }
+
+rs0 [direct: primary] fasopay_tp> var q2 = function () { return db.ledger_entries.find({ walletId: "W000612" }).sort({ createdAt: -1 }).limit(1) }
+
+rs0 [direct: primary] fasopay_tp> var q3 = function () { return db.transactions.find({ idempotencyKey: "idem-401046a409a4ab48" }) }
+
+rs0 [direct: primary] fasopay_tp> var resume = function (e) { var s = e.executionStats, wp = e.queryPlanner.winningPlan, p = wp.queryPlan || wp, r = []; while (p) { r.push(p.stage); p = p.inputStage }; print(r.join(" > ") + " | nReturned=" + s.nReturned + " keys=" + s.totalKeysExamined + " docs=" + s.totalDocsExamined + " ms=" + s.executionTimeMillis) }
+
+rs0 [direct: primary] fasopay_tp> printjson(q1().explain("executionStats"))
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'fasopay_tp.transactions',
+    parsedQuery: {
+      '$and': [
+        {
+          fromWalletId: {
+            '$eq': 'W000758'
+          }
+        },
+        {
+          status: {
+            '$eq': 'COMPLETED'
+          }
+        },
+        {
+          createdAt: {
+            '$lt': ISODate('2026-01-31T00:00:00.000Z')
+          }
+        },
+        {
+          createdAt: {
+            '$gte': ISODate('2026-01-30T00:00:00.000Z')
+          }
+        }
+      ]
+    },
+    indexFilterSet: false,
+    queryHash: '7EE2687C',
+    planCacheShapeHash: '7EE2687C',
+    planCacheKey: 'C9CB5394',
+    optimizationTimeMillis: 0,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'PROJECTION_SIMPLE',
+      transformBy: {
+        amount: 1,
+        _id: 0
+      },
+      inputStage: {
+        stage: 'COLLSCAN',
+        filter: {
+          '$and': [
+            {
+              fromWalletId: {
+                '$eq': 'W000758'
+              }
+            },
+            {
+              status: {
+                '$eq': 'COMPLETED'
+              }
+            },
+            {
+              createdAt: {
+                '$lt': ISODate('2026-01-31T00:00:00.000Z')
+              }
+            },
+            {
+              createdAt: {
+                '$gte': ISODate('2026-01-30T00:00:00.000Z')
+              }
+            }
+          ]
+        },
+        direction: 'forward'
+      }
+    },
+    rejectedPlans: []
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 7,
+    executionTimeMillis: 43,
+    totalKeysExamined: 0,
+    totalDocsExamined: 60000,
+    executionStages: {
+      isCached: false,
+      stage: 'PROJECTION_SIMPLE',
+      nReturned: 7,
+      executionTimeMillisEstimate: 33,
+      works: 60001,
+      advanced: 7,
+      needTime: 59993,
+      needYield: 0,
+      saveState: 2,
+      restoreState: 2,
+      isEOF: 1,
+      transformBy: {
+        amount: 1,
+        _id: 0
+      },
+      inputStage: {
+        stage: 'COLLSCAN',
+        filter: {
+          '$and': [
+            {
+              fromWalletId: {
+                '$eq': 'W000758'
+              }
+            },
+            {
+              status: {
+                '$eq': 'COMPLETED'
+              }
+            },
+            {
+              createdAt: {
+                '$lt': ISODate('2026-01-31T00:00:00.000Z')
+              }
+            },
+            {
+              createdAt: {
+                '$gte': ISODate('2026-01-30T00:00:00.000Z')
+              }
+            }
+          ]
+        },
+        nReturned: 7,
+        executionTimeMillisEstimate: 33,
+        works: 60001,
+        advanced: 7,
+        needTime: 59993,
+        needYield: 0,
+        saveState: 2,
+        restoreState: 2,
+        isEOF: 1,
+        direction: 'forward',
+        docsExamined: 60000
+      }
+    }
+  },
+  queryShapeHash: '2DCE94C79C5EAD4A6570E7B8603CF74AE40FDA17074E2A70A26814021F0345A3',
+  command: {
+    find: 'transactions',
+    filter: {
+      fromWalletId: 'W000758',
+      status: 'COMPLETED',
+      createdAt: {
+        '$gte': ISODate('2026-01-30T00:00:00.000Z'),
+        '$lt': ISODate('2026-01-31T00:00:00.000Z')
+      }
+    },
+    projection: {
+      amount: 1,
+      _id: 0
+    },
+    '$db': 'fasopay_tp'
+  },
+  serverInfo: {
+    host: '3bd3f8698595',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794195345, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794195345, i: 1 })
+}
+
+rs0 [direct: primary] fasopay_tp> resume(q1().explain("executionStats"))
+PROJECTION_SIMPLE > COLLSCAN | nReturned=7 keys=0 docs=60000 ms=35
+
+rs0 [direct: primary] fasopay_tp> printjson(q2().explain("executionStats"))
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'fasopay_tp.ledger_entries',
+    parsedQuery: {
+      walletId: {
+        '$eq': 'W000612'
+      }
+    },
+    indexFilterSet: false,
+    queryHash: '564EF997',
+    planCacheShapeHash: '564EF997',
+    planCacheKey: '90C92A9B',
+    optimizationTimeMillis: 0,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'SORT',
+      sortPattern: {
+        createdAt: -1
+      },
+      memLimit: 104857600,
+      limitAmount: 1,
+      type: 'simple',
+      inputStage: {
+        stage: 'COLLSCAN',
+        filter: {
+          walletId: {
+            '$eq': 'W000612'
+          }
+        },
+        direction: 'forward'
+      }
+    },
+    rejectedPlans: []
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 1,
+    executionTimeMillis: 79,
+    totalKeysExamined: 0,
+    totalDocsExamined: 141939,
+    executionStages: {
+      isCached: false,
+      stage: 'SORT',
+      nReturned: 1,
+      executionTimeMillisEstimate: 62,
+      works: 141942,
+      advanced: 1,
+      needTime: 141940,
+      needYield: 0,
+      saveState: 3,
+      restoreState: 3,
+      isEOF: 1,
+      sortPattern: {
+        createdAt: -1
+      },
+      memLimit: 104857600,
+      limitAmount: 1,
+      type: 'simple',
+      totalDataSizeSorted: 0,
+      usedDisk: false,
+      spills: 0,
+      spilledDataStorageSize: 0,
+      inputStage: {
+        stage: 'COLLSCAN',
+        filter: {
+          walletId: {
+            '$eq': 'W000612'
+          }
+        },
+        nReturned: 390,
+        executionTimeMillisEstimate: 62,
+        works: 141940,
+        advanced: 390,
+        needTime: 141549,
+        needYield: 0,
+        saveState: 3,
+        restoreState: 3,
+        isEOF: 1,
+        direction: 'forward',
+        docsExamined: 141939
+      }
+    }
+  },
+  queryShapeHash: '2E7D2BCC8FCBB33E19A08F140BEE2A3754976944CB611A511B1CD1A879F9E470',
+  command: {
+    find: 'ledger_entries',
+    filter: {
+      walletId: 'W000612'
+    },
+    sort: {
+      createdAt: -1
+    },
+    limit: 1,
+    '$db': 'fasopay_tp'
+  },
+  serverInfo: {
+    host: '3bd3f8698595',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794195355, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794195355, i: 1 })
+}
+
+rs0 [direct: primary] fasopay_tp> resume(q2().explain("executionStats"))
+SORT > COLLSCAN | nReturned=1 keys=0 docs=141939 ms=54
+
+rs0 [direct: primary] fasopay_tp> printjson(q3().explain("executionStats"))
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'fasopay_tp.transactions',
+    parsedQuery: {
+      idempotencyKey: {
+        '$eq': 'idem-401046a409a4ab48'
+      }
+    },
+    indexFilterSet: false,
+    queryHash: 'E6279C4B',
+    planCacheShapeHash: 'E6279C4B',
+    planCacheKey: 'A09D4EB7',
+    optimizationTimeMillis: 0,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'COLLSCAN',
+      filter: {
+        idempotencyKey: {
+          '$eq': 'idem-401046a409a4ab48'
+        }
+      },
+      direction: 'forward'
+    },
+    rejectedPlans: []
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 1,
+    executionTimeMillis: 30,
+    totalKeysExamined: 0,
+    totalDocsExamined: 60000,
+    executionStages: {
+      isCached: false,
+      stage: 'COLLSCAN',
+      filter: {
+        idempotencyKey: {
+          '$eq': 'idem-401046a409a4ab48'
+        }
+      },
+      nReturned: 1,
+      executionTimeMillisEstimate: 29,
+      works: 60001,
+      advanced: 1,
+      needTime: 59999,
+      needYield: 0,
+      saveState: 1,
+      restoreState: 1,
+      isEOF: 1,
+      direction: 'forward',
+      docsExamined: 60000
+    }
+  },
+  queryShapeHash: '0FD0F61C71C3E8DE088D3FAD3A4FE135CF4140EA6CFA6DA412E59507CE9AFC3D',
+  command: {
+    find: 'transactions',
+    filter: {
+      idempotencyKey: 'idem-401046a409a4ab48'
+    },
+    '$db': 'fasopay_tp'
+  },
+  serverInfo: {
+    host: '3bd3f8698595',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794195375, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794195375, i: 1 })
+}
+
+rs0 [direct: primary] fasopay_tp> resume(q3().explain("executionStats"))
+COLLSCAN | nReturned=1 keys=0 docs=60000 ms=29
+
+rs0 [direct: primary] fasopay_tp> var ca = [{ $match: { type: "MERCHANT_PAY", status: "COMPLETED" } }, { $group: { _id: "$merchantId",ca: { $sum: "$amount" }, paiements: { $sum: 1 } } }, { $sort: { ca: -1, _id: 1 } }]
+
+rs0 [direct: primary] fasopay_tp> var t0 = Date.now(); db.transactions.aggregate(ca).toArray(); print("E3 sans index : " + (Date.now()- t0) + " ms")
+E3 sans index : 76 ms
+
+rs0 [direct: primary] fasopay_tp> var t1 = Date.now(); db.transactions.aggregate(ca).toArray(); print("E3 sans index, 2e exécution : "+ (Date.now() - t1) + " ms")
+E3 sans index, 2e exécution : 46 ms
+
+rs0 [direct: primary] fasopay_tp> db.transactions.createIndex({ fromWalletId: 1, status: 1, createdAt: 1, amount: 1 }, { name: "idx_sorties_wallet_jour" })
+idx_sorties_wallet_jour
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.createIndex({ walletId: 1, createdAt: -1 }, { name: "idx_ledger_wallet_date" })
+idx_ledger_wallet_date
+rs0 [direct: primary] fasopay_tp> db.transactions.createIndex({ idempotencyKey: 1 }, { unique: true, name: "uniq_idempotency_key" })
+uniq_idempotency_key
+rs0 [direct: primary] fasopay_tp> printjson(q1().explain("executionStats"))
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'fasopay_tp.transactions',
+    parsedQuery: {
+      '$and': [
+        {
+          fromWalletId: {
+            '$eq': 'W000758'
+          }
+        },
+        {
+          status: {
+            '$eq': 'COMPLETED'
+          }
+        },
+        {
+          createdAt: {
+            '$lt': ISODate('2026-01-31T00:00:00.000Z')
+          }
+        },
+        {
+          createdAt: {
+            '$gte': ISODate('2026-01-30T00:00:00.000Z')
+          }
+        }
+      ]
+    },
+    indexFilterSet: false,
+    queryHash: '7EE2687C',
+    planCacheShapeHash: '7EE2687C',
+    planCacheKey: 'AFFF39E9',
+    optimizationTimeMillis: 33,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'PROJECTION_COVERED',
+      transformBy: {
+        amount: 1,
+        _id: 0
+      },
+      inputStage: {
+        stage: 'IXSCAN',
+        keyPattern: {
+          fromWalletId: 1,
+          status: 1,
+          createdAt: 1,
+          amount: 1
+        },
+        indexName: 'idx_sorties_wallet_jour',
+        isMultiKey: false,
+        multiKeyPaths: {
+          fromWalletId: [],
+          status: [],
+          createdAt: [],
+          amount: []
+        },
+        isUnique: false,
+        isSparse: false,
+        isPartial: false,
+        indexVersion: 2,
+        direction: 'forward',
+        indexBounds: {
+          fromWalletId: [
+            '["W000758", "W000758"]'
+          ],
+          status: [
+            '["COMPLETED", "COMPLETED"]'
+          ],
+          createdAt: [
+            '[new Date(1769731200000), new Date(1769817600000))'
+          ],
+          amount: [
+            '[MinKey, MaxKey]'
+          ]
+        }
+      }
+    },
+    rejectedPlans: []
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 7,
+    executionTimeMillis: 38,
+    totalKeysExamined: 7,
+    totalDocsExamined: 0,
+    executionStages: {
+      isCached: false,
+      stage: 'PROJECTION_COVERED',
+      nReturned: 7,
+      executionTimeMillisEstimate: 4,
+      works: 8,
+      advanced: 7,
+      needTime: 0,
+      needYield: 0,
+      saveState: 0,
+      restoreState: 0,
+      isEOF: 1,
+      transformBy: {
+        amount: 1,
+        _id: 0
+      },
+      inputStage: {
+        stage: 'IXSCAN',
+        nReturned: 7,
+        executionTimeMillisEstimate: 4,
+        works: 8,
+        advanced: 7,
+        needTime: 0,
+        needYield: 0,
+        saveState: 0,
+        restoreState: 0,
+        isEOF: 1,
+        keyPattern: {
+          fromWalletId: 1,
+          status: 1,
+          createdAt: 1,
+          amount: 1
+        },
+        indexName: 'idx_sorties_wallet_jour',
+        isMultiKey: false,
+        multiKeyPaths: {
+          fromWalletId: [],
+          status: [],
+          createdAt: [],
+          amount: []
+        },
+        isUnique: false,
+        isSparse: false,
+        isPartial: false,
+        indexVersion: 2,
+        direction: 'forward',
+        indexBounds: {
+          fromWalletId: [
+            '["W000758", "W000758"]'
+          ],
+          status: [
+            '["COMPLETED", "COMPLETED"]'
+          ],
+          createdAt: [
+            '[new Date(1769731200000), new Date(1769817600000))'
+          ],
+          amount: [
+            '[MinKey, MaxKey]'
+          ]
+        },
+        keysExamined: 7,
+        seeks: 1,
+        dupsTested: 0,
+        dupsDropped: 0
+      }
+    }
+  },
+  queryShapeHash: '2DCE94C79C5EAD4A6570E7B8603CF74AE40FDA17074E2A70A26814021F0345A3',
+  command: {
+    find: 'transactions',
+    filter: {
+      fromWalletId: 'W000758',
+      status: 'COMPLETED',
+      createdAt: {
+        '$gte': ISODate('2026-01-30T00:00:00.000Z'),
+        '$lt': ISODate('2026-01-31T00:00:00.000Z')
+      }
+    },
+    projection: {
+      amount: 1,
+      _id: 0
+    },
+    '$db': 'fasopay_tp'
+  },
+  serverInfo: {
+    host: '3bd3f8698595',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794195446, i: 5 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794195446, i: 5 })
+}
+
+rs0 [direct: primary] fasopay_tp> resume(q1().explain("executionStats"))
+PROJECTION_COVERED > IXSCAN | nReturned=7 keys=7 docs=0 ms=0
+
+rs0 [direct: primary] fasopay_tp> printjson(q2().explain("executionStats"))
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'fasopay_tp.ledger_entries',
+    parsedQuery: {
+      walletId: {
+        '$eq': 'W000612'
+      }
+    },
+    indexFilterSet: false,
+    queryHash: '564EF997',
+    planCacheShapeHash: '564EF997',
+    planCacheKey: 'F803AF3F',
+    optimizationTimeMillis: 0,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'LIMIT',
+      limitAmount: 1,
+      inputStage: {
+        stage: 'FETCH',
+        inputStage: {
+          stage: 'IXSCAN',
+          keyPattern: {
+            walletId: 1,
+            createdAt: -1
+          },
+          indexName: 'idx_ledger_wallet_date',
+          isMultiKey: false,
+          multiKeyPaths: {
+            walletId: [],
+            createdAt: []
+          },
+          isUnique: false,
+          isSparse: false,
+          isPartial: false,
+          indexVersion: 2,
+          direction: 'forward',
+          indexBounds: {
+            walletId: [
+              '["W000612", "W000612"]'
+            ],
+            createdAt: [
+              '[MaxKey, MinKey]'
+            ]
+          }
+        }
+      }
+    },
+    rejectedPlans: []
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 1,
+    executionTimeMillis: 31,
+    totalKeysExamined: 1,
+    totalDocsExamined: 1,
+    executionStages: {
+      isCached: false,
+      stage: 'LIMIT',
+      nReturned: 1,
+      executionTimeMillisEstimate: 1,
+      works: 2,
+      advanced: 1,
+      needTime: 0,
+      needYield: 0,
+      saveState: 1,
+      restoreState: 1,
+      isEOF: 1,
+      limitAmount: 1,
+      inputStage: {
+        stage: 'FETCH',
+        nReturned: 1,
+        executionTimeMillisEstimate: 1,
+        works: 1,
+        advanced: 1,
+        needTime: 0,
+        needYield: 0,
+        saveState: 1,
+        restoreState: 1,
+        isEOF: 0,
+        docsExamined: 1,
+        alreadyHasObj: 0,
+        inputStage: {
+          stage: 'IXSCAN',
+          nReturned: 1,
+          executionTimeMillisEstimate: 1,
+          works: 1,
+          advanced: 1,
+          needTime: 0,
+          needYield: 0,
+          saveState: 1,
+          restoreState: 1,
+          isEOF: 0,
+          keyPattern: {
+            walletId: 1,
+            createdAt: -1
+          },
+          indexName: 'idx_ledger_wallet_date',
+          isMultiKey: false,
+          multiKeyPaths: {
+            walletId: [],
+            createdAt: []
+          },
+          isUnique: false,
+          isSparse: false,
+          isPartial: false,
+          indexVersion: 2,
+          direction: 'forward',
+          indexBounds: {
+            walletId: [
+              '["W000612", "W000612"]'
+            ],
+            createdAt: [
+              '[MaxKey, MinKey]'
+            ]
+          },
+          keysExamined: 1,
+          seeks: 1,
+          dupsTested: 0,
+          dupsDropped: 0
+        }
+      }
+    }
+  },
+  queryShapeHash: '2E7D2BCC8FCBB33E19A08F140BEE2A3754976944CB611A511B1CD1A879F9E470',
+  command: {
+    find: 'ledger_entries',
+    filter: {
+      walletId: 'W000612'
+    },
+    sort: {
+      createdAt: -1
+    },
+    limit: 1,
+    '$db': 'fasopay_tp'
+  },
+  serverInfo: {
+    host: '3bd3f8698595',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794195465, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794195465, i: 1 })
+}
+
+rs0 [direct: primary] fasopay_tp> resume(q2().explain("executionStats"))
+LIMIT > FETCH > IXSCAN | nReturned=1 keys=1 docs=1 ms=0
+
+rs0 [direct: primary] fasopay_tp> printjson(q3().explain("executionStats"))
+{
+  explainVersion: '1',
+  queryPlanner: {
+    namespace: 'fasopay_tp.transactions',
+    parsedQuery: {
+      idempotencyKey: {
+        '$eq': 'idem-401046a409a4ab48'
+      }
+    },
+    indexFilterSet: false,
+    queryHash: 'E6279C4B',
+    planCacheShapeHash: 'E6279C4B',
+    planCacheKey: '7EFBCCF4',
+    optimizationTimeMillis: 0,
+    maxIndexedOrSolutionsReached: false,
+    maxIndexedAndSolutionsReached: false,
+    maxScansToExplodeReached: false,
+    prunedSimilarIndexes: false,
+    winningPlan: {
+      isCached: false,
+      stage: 'EXPRESS_IXSCAN',
+      keyPattern: '{ idempotencyKey: 1 }',
+      indexName: 'uniq_idempotency_key'
+    },
+    rejectedPlans: []
+  },
+  executionStats: {
+    executionSuccess: true,
+    nReturned: 1,
+    executionTimeMillis: 2,
+    totalKeysExamined: 1,
+    totalDocsExamined: 1,
+    executionStages: {
+      isCached: false,
+      stage: 'EXPRESS_IXSCAN',
+      keyPattern: '{ idempotencyKey: 1 }',
+      indexName: 'uniq_idempotency_key',
+      keysExamined: 1,
+      docsExamined: 1,
+      nReturned: 1
+    }
+  },
+  queryShapeHash: '0FD0F61C71C3E8DE088D3FAD3A4FE135CF4140EA6CFA6DA412E59507CE9AFC3D',
+  command: {
+    find: 'transactions',
+    filter: {
+      idempotencyKey: 'idem-401046a409a4ab48'
+    },
+    '$db': 'fasopay_tp'
+  },
+  serverInfo: {
+    host: '3bd3f8698595',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794195485, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794195485, i: 1 })
+}
+
+rs0 [direct: primary] fasopay_tp> resume(q3().explain("executionStats"))
+EXPRESS_IXSCAN | nReturned=1 keys=1 docs=1 ms=0
+
+rs0 [direct: primary] fasopay_tp> resume(db.ledger_entries.find({ walletId: "W000612" }).sort({ createdAt: -1 }).explain("executionStats"))
+FETCH > IXSCAN | nReturned=390 keys=390 docs=390 ms=1
+
+rs0 [direct: primary] fasopay_tp> try { db.transactions.insertOne({ _id: "TEST_DOUBLON", idempotencyKey: "idem-401046a409a4ab48", type: "P2P", amount: 100, fee: 0, status: "PENDING", channel: "APP", createdAt: new Date(), riskScore: 0, flags: [] }); print("ACCEPTE (anormal)"); db.transactions.deleteOne({ _id: "TEST_DOUBLON" }) } catch (e) { print("transactions : code " + e.code); printjson(e.errmsg) }
+transactions : code 11000
+E11000 duplicate key error collection: fasopay_tp.transactions index: uniq_idempotency_key dup key: { idempotencyKey: "idem-401046a409a4ab48" }
+
+rs0 [direct: primary] fasopay_tp> db.transactions.getIndexes()
+[
+  { v: 2, key: { _id: 1 }, name: '_id_' },
+  {
+    v: 2,
+    key: { fromWalletId: 1, status: 1, createdAt: 1, amount: 1 },
+    name: 'idx_sorties_wallet_jour'
+  },
+  {
+    v: 2,
+    key: { idempotencyKey: 1 },
+    name: 'uniq_idempotency_key',
+    unique: true
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.getIndexes()
+[
+  { v: 2, key: { _id: 1 }, name: '_id_' },
+  {
+    v: 2,
+    key: { walletId: 1, createdAt: -1 },
+    name: 'idx_ledger_wallet_date'
+  }
+]
+rs0 [direct: primary] fasopay_tp> ["transactions", "ledger_entries"].forEach(function (n) { var s = db[n].stats(); print(n + " : size=" + s.size + " storageSize=" + s.storageSize + " avgObjSize=" + s.avgObjSize + " totalIndexSize=" + s.totalIndexSize); printjson(s.indexSizes) })
+transactions : size=15181339 storageSize=7983104 avgObjSize=253 totalIndexSize=5054464
+{
+  _id_: 2514944,
+  idx_sorties_wallet_jour: 1028096,
+  uniq_idempotency_key: 1511424
+}
+ledger_entries : size=18479703 storageSize=9265152 avgObjSize=130 totalIndexSize=7475200
+{
+  _id_: 5316608,
+  idx_ledger_wallet_date: 2158592
+}
+
+rs0 [direct: primary] fasopay_tp> db.getCollectionNames().sort().forEach(function (n) { print(n + " : " + db[n].countDocuments()) })
+customers : 2000
+fraud_alerts : 0
+ledger_entries : 141939
+merchants : 150
+outbox : 0
+transactions : 60000
+wallets : 2000
+
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 
+=== Complément Partie 3 : 3 exécutions et médianes (avant forcé par hint $natural), taille des index avant/après, cas où l'index n'aide pas, index refusé mesuré puis supprimé ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 18:46:07 UTC 2026
+Current Mongosh Log ID: 6af214f3feb2a8c7340a5373
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> var q1 = function () { return db.transactions.find({ fromWalletId: "W000758", status: "COMPLETED", createdAt: { $gte: ISODate("2026-01-30T00:00:00Z"), $lt: ISODate("2026-01-31T00:00:00Z") } }, { amount: 1, _id: 0 }) }
+
+rs0 [direct: primary] fasopay_tp> var q2 = function () { return db.ledger_entries.find({ walletId: "W000612" }).sort({ createdAt: -1 }).limit(1) }
+
+rs0 [direct: primary] fasopay_tp> var q3 = function () { return db.transactions.find({ idempotencyKey: "idem-401046a409a4ab48" }) }
+
+rs0 [direct: primary] fasopay_tp> var med = function (a) { a = a.slice().sort(function (x, y) { return x - y }); return a[Math.floor(a.length / 2)] }
+
+rs0 [direct: primary] fasopay_tp> var trois = function (label, f) { var t = [], e; for (var i = 0; i < 3; i++) { e = f().explain("executionStats"); t.push(e.executionStats.executionTimeMillis) }; var s = e.executionStats, wp = e.queryPlanner.winningPlan, p = wp.queryPlan || wp, r = []; while (p) { r.push(p.stage); p = p.inputStage }; print(label + " | " + r.join(" > ") + " | nReturned=" + s.nReturned + " keys=" + s.totalKeysExamined + " docs=" + s.totalDocsExamined + " | ms=" + t.join(", ") + " | mediane=" + med(t)) }
+
+rs0 [direct: primary] fasopay_tp> trois("Q1 avant (hint $natural)", function () { return q1().hint({ $natural: 1 }) })
+Q1 avant (hint $natural) | PROJECTION_SIMPLE > COLLSCAN | nReturned=7 keys=0 docs=60000 | ms=23, 19, 19 | mediane=19
+
+rs0 [direct: primary] fasopay_tp> trois("Q1 apres (index)", q1)
+Q1 apres (index) | PROJECTION_COVERED > IXSCAN | nReturned=7 keys=7 docs=0 | ms=3, 0, 0 | mediane=0
+
+rs0 [direct: primary] fasopay_tp> trois("Q2 avant (hint $natural)", function () { return q2().hint({ $natural: 1 }) })
+Q2 avant (hint $natural) | SORT > COLLSCAN | nReturned=1 keys=0 docs=141939 | ms=50, 41, 43 | mediane=43
+
+rs0 [direct: primary] fasopay_tp> trois("Q2 apres (index)", q2)
+Q2 apres (index) | LIMIT > FETCH > IXSCAN | nReturned=1 keys=1 docs=1 | ms=0, 0, 0 | mediane=0
+
+rs0 [direct: primary] fasopay_tp> trois("Q3 avant (hint $natural)", function () { return q3().hint({ $natural: 1 }) })
+Q3 avant (hint $natural) | COLLSCAN | nReturned=1 keys=0 docs=60000 | ms=25, 18, 17 | mediane=18
+
+rs0 [direct: primary] fasopay_tp> trois("Q3 apres (index)", q3)
+Q3 apres (index) | EXPRESS_IXSCAN | nReturned=1 keys=1 docs=1 | ms=1, 0, 0 | mediane=0
+
+rs0 [direct: primary] fasopay_tp> ["transactions", "ledger_entries"].forEach(function (n) { var s = db[n].stats(); var id = s.indexSizes._id_; print(n + " : avant (seul_id_) = " + id + " octets ; apres = " + s.totalIndexSize + " octets ; ajout = " + (s.totalIndexSize - id) + " octets") })
+transactions : avant (seul _id_) = 2514944 octets ; apres = 5054464 octets ; ajout = 2539520 octets
+ledger_entries : avant (seul _id_) = 5316608 octets ; apres = 7475200 octets ; ajout = 2158592 octets
+
+rs0 [direct: primary] fasopay_tp> trois("Sans prefixe fromWalletId", function () { return db.transactions.find({ status: "COMPLETED", createdAt: { $gte: ISODate("2026-01-30T00:00:00Z"), $lt: ISODate("2026-01-31T00:00:00Z") } }) })
+Sans prefixe fromWalletId | COLLSCAN | nReturned=575 keys=0 docs=60000 | ms=41, 33, 27 | mediane=33
+
+rs0 [direct: primary] fasopay_tp> var ca = [{ $match: { type: "MERCHANT_PAY", status: "COMPLETED" } }, { $group: { _id: "$merchantId", ca: { $sum: "$amount" }, paiements: { $sum: 1 } } }, { $sort: { ca: -1, _id: 1 } }]
+
+rs0 [direct: primary] fasopay_tp> var tempsE3 = function (label) { var t = []; for (var i = 0; i < 3; i++) { var t0 = Date.now(); db.transactions.aggregate(ca).toArray(); t.push(Date.now() - t0) }; print(label + " | ms=" + t.join(", ") + " | mediane=" + med(t)) }
+
+rs0 [direct: primary] fasopay_tp> var resumeAgg = function (e) { var x = (e.stages && e.stages[0].$cursor) ? e.stages[0].$cursor : e; var s = x.executionStats, wp = x.queryPlanner.winningPlan, p = wp.queryPlan || wp, r = []; while (p) { r.push(p.stage); p = p.inputStage }; print(r.join(" > ") + " | keys=" + s.totalKeysExamined + " docs=" + s.totalDocsExamined) }
+
+rs0 [direct: primary] fasopay_tp> tempsE3("E3 sans l'index refuse")
+E3 sans l'index refuse | ms=30, 22, 23 | mediane=23
+
+rs0 [direct: primary] fasopay_tp> resumeAgg(db.transactions.explain("executionStats").aggregate(ca))
+GROUP > COLLSCAN | keys=0 docs=60000
+
+rs0 [direct: primary] fasopay_tp> db.transactions.createIndex({ type: 1, status: 1, merchantId: 1, amount: 1 }, { name: "idx_refuse_ca_marchand" })
+idx_refuse_ca_marchand
+rs0 [direct: primary] fasopay_tp> tempsE3("E3 avec l'index refuse")
+E3 avec l'index refuse | ms=17, 9, 8 | mediane=9
+
+rs0 [direct: primary] fasopay_tp> resumeAgg(db.transactions.explain("executionStats").aggregate(ca))
+GROUP > PROJECTION_COVERED > IXSCAN | keys=16603 docs=0
+
+rs0 [direct: primary] fasopay_tp> print("taille de l'index refuse : " + db.transactions.stats().indexSizes.idx_refuse_ca_marchand + " octets")
+taille de l'index refuse : 610304 octets
+
+rs0 [direct: primary] fasopay_tp> db.transactions.dropIndex("idx_refuse_ca_marchand")
+{
+  nIndexesWas: 4,
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794250184, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794250184, i: 1 })
+}
+rs0 [direct: primary] fasopay_tp> db.transactions.getIndexes().map(function (i) { return i.name })
+[ '_id_', 'idx_sorties_wallet_jour', 'uniq_idempotency_key' ]
+rs0 [direct: primary] fasopay_tp> db.getCollectionNames().sort().forEach(function (n) { print(n + " : " + db[n].countDocuments()) })
+customers : 2000
+fraud_alerts : 0
+ledger_entries : 141939
+merchants : 150
+outbox : 0
+transactions : 60000
+wallets : 2000
+
+rs0 [direct: primary] fasopay_tp> exit

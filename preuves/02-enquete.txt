@@ -90,3 +90,1071 @@ What's next:
     Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
     Learn more at https://docs.docker.com/go/debug-cli/
 PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 
+
+=== E2 : clients qui découpent leurs transferts sous le plafond journalier ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 02:47:20 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af1343b72f2074ed015cc8c
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> var e2 = function (seuil, minTx) { return [{ $match: { status: "COMPLETED", type: { $in: ["P2P", "CASH_OUT"] }, fromWalletId: { $exists: true } } }, { $lookup: { from: "wallets", localField: "fromWalletId", foreignField: "_id", as: "w"} }, { $unwind: "$w" }, { $match: { $expr: { $and: [{ $gte: ["$amount", { $multiply: ["$w.dailyLimit", seuil] }] }, { $lte: ["$amount", "$w.dailyLimit"] }] } } }, { $group: { _id: { wallet: "$fromWalletId", jour: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } }, transactions: { $sum: 1 }, total: { $sum: "$amount" }, plafond: { $first: "$w.dailyLimit" } } }, { $match: { transactions: { $g$gte: minTx } } }, { $sort: { "_id.wallet": 1, "_id.jour": 1 } }] }
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(e2(0.9, 3)).toArray()
+[
+  {
+    _id: { wallet: 'W000214', jour: '2026-01-16' },
+    transactions: 6,
+    total: 2896975,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W000214', jour: '2026-05-12' },
+    transactions: 7,
+    total: 3262125,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W000214', jour: '2026-05-16' },
+    transactions: 5,
+    total: 2332425,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W000214', jour: '2026-05-19' },
+    transactions: 7,
+    total: 3342800,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W000758', jour: '2026-01-30' },
+    transactions: 7,
+    total: 1320325,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W000758', jour: '2026-02-06' },
+    transactions: 5,
+    total: 937700,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W000758', jour: '2026-03-03' },
+    transactions: 5,
+    total: 929225,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W000758', jour: '2026-06-21' },
+    transactions: 7,
+    total: 1327775,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W001070', jour: '2026-01-29' },
+    transactions: 5,
+    total: 2339150,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001070', jour: '2026-02-26' },
+    transactions: 5,
+    total: 2375200,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001070', jour: '2026-03-16' },
+    transactions: 6,
+    total: 2817925,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001070', jour: '2026-05-07' },
+    transactions: 4,
+    total: 1875750,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001218', jour: '2026-01-14' },
+    transactions: 5,
+    total: 2401975,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001218', jour: '2026-03-05' },
+    transactions: 5,
+    total: 2315000,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001218', jour: '2026-04-24' },
+    transactions: 4,
+    total: 1904525,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001218', jour: '2026-05-20' },
+    transactions: 4,
+    total: 1862675,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001218', jour: '2026-05-24' },
+    transactions: 5,
+    total: 2412375,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001218', jour: '2026-06-04' },
+    transactions: 5,
+    total: 2382325,
+    plafond: 500000
+  },
+  {
+    _id: { wallet: 'W001322', jour: '2026-01-13' },
+    transactions: 5,
+    total: 948300,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W001322', jour: '2026-02-09' },
+    transactions: 5,
+    total: 964100,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W001322', jour: '2026-05-03' },
+    transactions: 4,
+    total: 773925,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W001322', jour: '2026-05-06' },
+    transactions: 5,
+    total: 958925,
+    plafond: 200000
+  },
+  {
+    _id: { wallet: 'W001322', jour: '2026-06-02' },
+    transactions: 5,
+    total: 953675,
+    plafond: 200000
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(e2(0.9, 3).concat([{ $group: { _id: "$_id.wallet", jours: { $sum: 1 }, transactions: { $sum: "$transactions" }, total: { $sum: "$total" }, plafond: { $first: "$plafond" } } }, { $sort: { _id: 1 } }]))
+[
+  {
+    _id: 'W000214',
+    jours: 4,
+    transactions: 25,
+    total: 11834325,
+    plafond: 500000
+  },
+  {
+    _id: 'W000758',
+    jours: 4,
+    transactions: 24,
+    total: 4515025,
+    plafond: 200000
+  },
+  {
+    _id: 'W001070',
+    jours: 4,
+    transactions: 20,
+    total: 9408025,
+    plafond: 500000
+  },
+  {
+    _id: 'W001218',
+    jours: 6,
+    transactions: 28,
+    total: 13278875,
+    plafond: 500000
+  },
+  {
+    _id: 'W001322',
+    jours: 5,
+    transactions: 24,
+    total: 4598925,
+    plafond: 200000
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.wallets.aggregate([{ $match: { _id: { $in: ["W000214", "W000758", "W001070", "W001218", "W001322"] } } }, { $lookup: { from: "customers", localField: "customerId", foreignField: "_id", as: "c" } }, { $unwind: "$c" }, { $project: { cucustomerId: 1, dailyLimit: 1, segment: "$c.segment", kycLevel: "$c.kycLevel", city: "$c.city" } }, { $sort: { _id: 1 } }])
+[
+  {
+    _id: 'W000214',
+    customerId: 'C000214',
+    dailyLimit: 500000,
+    segment: 'ETUDIANT',
+    kycLevel: 2,
+    city: 'Ouagadougou'
+  },
+  {
+    _id: 'W000758',
+    customerId: 'C000758',
+    dailyLimit: 200000,
+    segment: 'COMMERCANT',
+    kycLevel: 1,
+    city: 'Tenkodogo'
+  },
+  {
+    _id: 'W001070',
+    customerId: 'C001070',
+    dailyLimit: 500000,
+    segment: 'GRAND_PUBLIC',
+    kycLevel: 2,
+    city: 'Ouagadougou'
+  },
+  {
+    _id: 'W001218',
+    customerId: 'C001218',
+    dailyLimit: 500000,
+    segment: 'GRAND_PUBLIC',
+    kycLevel: 2,
+    city: 'Kaya'
+  },
+  {
+    _id: 'W001322',
+    customerId: 'C001322',
+    dailyLimit: 200000,
+    segment: 'GRAND_PUBLIC',
+    kycLevel: 1,
+    city: 'Banfora'
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.wallets.findOne({ _id: "W000758" })
+{
+  _id: 'W000758',
+  customerId: 'C000758',
+  balance: 332795,
+  currency: 'XOF',
+  status: 'ACTIVE',
+  dailyLimit: 200000,
+  version: 60,
+  updatedAt: ISODate('2026-06-25T12:14:22.937Z')
+}
+rs0 [direct: primary] fasopay_tp> db.transactions.find({ fromWalletId: "W000758", createdAt: { $gte: ISODate("2026-01-30T00:00:00Z"), $$lt: ISODate("2026-01-31T00:00:00Z") } }, { type: 1, amount: 1, status: 1, toWalletId: 1, createdAt: 1, flags: 1 }).sort({ createdAt: 1 })
+[
+  {
+    _id: 'T0010875',
+    type: 'CASH_OUT',
+    amount: 191375,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-30T08:25:47.507Z'),
+    flags: [ 'HIGH_AMOUNT' ]
+  },
+  {
+    _id: 'T0010896',
+    type: 'P2P',
+    toWalletId: 'W000951',
+    amount: 186050,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-30T08:54:47.507Z'),
+    flags: [ 'HIGH_AMOUNT' ]
+  },
+  {
+    _id: 'T0010909',
+    type: 'CASH_OUT',
+    amount: 189575,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-30T09:20:47.507Z'),
+    flags: [ 'HIGH_AMOUNT' ]
+  },
+  {
+    _id: 'T0010920',
+    type: 'P2P',
+    toWalletId: 'W001312',
+    amount: 181850,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-30T09:41:47.507Z'),
+    flags: [ 'HIGH_AMOUNT' ]
+  },
+  {
+    _id: 'T0010955',
+    type: 'P2P',
+    toWalletId: 'W001312',
+    amount: 191975,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-30T10:17:47.507Z'),
+    flags: [ 'HIGH_AMOUNT' ]
+  },
+  {
+    _id: 'T0010970',
+    type: 'P2P',
+    toWalletId: 'W000951',
+    amount: 191475,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-30T10:40:47.507Z'),
+    flags: [ 'HIGH_AMOUNT' ]
+  },
+  {
+    _id: 'T0010983',
+    type: 'CASH_OUT',
+    amount: 188025,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-30T11:21:47.507Z'),
+    flags: [ 'HIGH_AMOUNT' ]
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { fromWalletId: { $exists: true } } }, { $lookup: { from: "wallets", localField: "fromWalletId", foreignField: "_id", as: "w" } }, { $unwind: "$w" }, { $group: { _id: null, sorties: { $sum: 1 }, depassantLePlafond: { $sum: { $cond: [{ $gt: ["$amount", "$w.dailyLimit"] }, 1, 0] } } } }])
+[ { _id: null, sorties: 46495, depassantLePlafond: 0 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { fromWalletId: { $exists: true } } }, { $lookup: { from: "wallets", localField: "fromWalletId", foreignField: "_id", as: "w" } }, { $unwind: "$w" }, { $match: { $expr: { $and: [{ $gte: ["$amount", { $multiply: ["$w.dailyLimit", 0.9] }] }, { $lte: ["$amount", "$w.dailyLimit"] }] } } }, { $group: { _id: { type: "$type", status: "$status" }, n: { $sum: 1 }, wallets: { $addToSet: "$fromWalletId" } } }])
+[
+  {
+    _id: { type: 'CASH_OUT', status: 'COMPLETED' },
+    n: 48,
+    wallets: [ 'W001322', 'W001218', 'W000214', 'W001070', 'W000758' ]
+  },
+  {
+    _id: { type: 'P2P', status: 'COMPLETED' },
+    n: 73,
+    wallets: [ 'W000214', 'W001070', 'W000758', 'W001322', 'W001218' ]
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(e2(0.5, 3).concat([{ $group: { _id: "$_id.wallet" } }, { $count: "wallets"}]))
+[ { wallets: 5 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(e2(0.7, 3).concat([{ $group: { _id: "$_id.wallet" } }, { $count: "wallets"}]))
+[ { wallets: 5 } ]
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 
+
+=== E3 : marchands qui concentrent le CA, courbe de Pareto ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 03:12:03 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af13a0d7110ccd8addb674a
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { type: "MERCHANT_PAY" } }, { $group: { _id: "$status", paiements: { $sum: 1 }, montant: { $sum: "$amount" } } }, { $sort: { _id: 1 } }])
+[
+  { _id: 'COMPLETED', paiements: 16603, montant: 229050525 },
+  { _id: 'FAILED', paiements: 1243, montant: 22883125 },
+  { _id: 'PENDING', paiements: 13, montant: 242250 },
+  { _id: 'REVERSED', paiements: 130, montant: 1822900 }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { status: "COMPLETED" } }, { $group: { _id: "$type", transactions: { $sum: 1 }, montant: { $sum: "$amount" } } }, { $sort: { _id: 1 } }])
+[
+  { _id: 'BILL', transactions: 5178, montant: 72813575 },
+  { _id: 'CASH_IN', transactions: 13232, montant: 1313886875 },
+  { _id: 'CASH_OUT', transactions: 6312, montant: 177409300 },
+  { _id: 'MERCHANT_PAY', transactions: 16603, montant: 229050525 },
+  { _id: 'P2P', transactions: 14879, montant: 153143050 }
+]
+rs0 [direct: primary] fasopay_tp> var ca = [{ $match: { type: "MERCHANT_PAY", status: "COMPLETED" } }, { $group: { _id: "$merchantId",ca: { $sum: "$amount" }, paiements: { $sum: 1 } } }, { $sort: { ca: -1, _id: 1 } }]
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(ca.concat([{ $limit: 10 }, { $lookup: { from: "merchants", localField: "_id", foreignField: "_id", as: "m" } }, { $unwind: "$m" }, { $project: { ca: 1, paiements: 1, nom: "$m.name", categorie: "$m.category", ville: "$m.city" } }, { $sort: { ca: -1, _id: 1 } }]))
+[
+  {
+    _id: 'M00130',
+    ca: 62325425,
+    paiements: 2079,
+    nom: 'École Paspanga',
+    categorie: 'Éducation',
+    ville: 'Kaya'
+  },
+  {
+    _id: 'M00044',
+    ca: 41440550,
+    paiements: 4162,
+    nom: 'Faso Market Central',
+    categorie: 'Supermarché',
+    ville: 'Kaya'
+  },
+  {
+    _id: 'M00062',
+    ca: 21097950,
+    paiements: 1142,
+    nom: 'Pagne & Mode Liberté',
+    categorie: 'Habillement',
+    ville: 'Ouagadougou'
+  },
+  {
+    _id: 'M00149',
+    ca: 8830225,
+    paiements: 589,
+    nom: 'Marché Liberté',
+    categorie: 'Supermarché',
+    ville: 'Tenkodogo'
+  },
+  {
+    _id: 'M00068',
+    ca: 6534925,
+    paiements: 436,
+    nom: 'Super Wend-Panga',
+    categorie: 'Supermarché',
+    ville: 'Dori'
+  },
+  {
+    _id: 'M00063',
+    ca: 4739775,
+    paiements: 298,
+    nom: 'Alimentation Nonsin',
+    categorie: 'Supermarché',
+    ville: 'Bobo-Dioulasso'
+  },
+  {
+    _id: 'M00011',
+    ca: 3180900,
+    paiements: 169,
+    nom: 'Pagne & Mode Larlé',
+    categorie: 'Habillement',
+    ville: 'Ouagadougou'
+  },
+  {
+    _id: 'M00001',
+    ca: 2834975,
+    paiements: 62,
+    nom: 'Électro Nonsin',
+    categorie: 'Électronique',
+    ville: "Fada N'Gourma"
+  },
+  {
+    _id: 'M00106',
+    ca: 2796525,
+    paiements: 84,
+    nom: "École Patte d'Oie",
+    categorie: 'Éducation',
+    ville: "Fada N'Gourma"
+  },
+  {
+    _id: 'M00119',
+    ca: 2600650,
+    paiements: 149,
+    nom: 'Boutique Gounghin',
+    categorie: 'Habillement',
+    ville: 'Banfora'
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(ca.concat([{ $group: { _id: "$ca" } }, { $count: "caDistincts" }]))
+[ { caDistincts: 150 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(ca.concat([{ $setWindowFields: { sortBy: { ca: -1 }, output: { rang: { $doc$documentNumber: {} }, caCumule: { $sum: "$ca", window: { documents: ["unbounded", "current"] } }, totalCA: { $sum: "$ca", window: {docdocuments: ["unbounded", "unbounded"] } }, marchands: { $sum: 1, window: { documents: ["unbounded", "unbounded"] } } } } }, { $match: { $expr: { $or: [{ $eq: ["$rang", 1] }, { $eq: [{ $mod: ["$rang", 15] }, 0] }] } } }, { $project: { _id: 0, rang: 1, marchands: 1, partMpartMarchandsPct: { $round: [{ $multiply: [{ $divide: ["$rang", "$marchands"] }, 100] }, 1] }, caCumule: 1, totalCA: 1, partCaPct: { $r$round: [{ $multiply: [{ $divide: ["$caCumule", "$totalCA"] }, 100] }, 2] } } }]))
+[
+  {
+    rang: 1,
+    caCumule: 62325425,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 0.7,
+    partCaPct: 27.21
+  },
+  {
+    rang: 15,
+    caCumule: 166170725,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 10,
+    partCaPct: 72.55
+  },
+  {
+    rang: 30,
+    caCumule: 187737275,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 20,
+    partCaPct: 81.96
+  },
+  {
+    rang: 45,
+    caCumule: 200697825,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 30,
+    partCaPct: 87.62
+  },
+  {
+    rang: 60,
+    caCumule: 209491200,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 40,
+    partCaPct: 91.46
+  },
+  {
+    rang: 75,
+    caCumule: 215958375,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 50,
+    partCaPct: 94.28
+  },
+  {
+    rang: 90,
+    caCumule: 220840875,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 60,
+    partCaPct: 96.42
+  },
+  {
+    rang: 105,
+    caCumule: 224335275,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 70,
+    partCaPct: 97.94
+  },
+  {
+    rang: 120,
+    caCumule: 226845425,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 80,
+    partCaPct: 99.04
+  },
+  {
+    rang: 135,
+    caCumule: 228384600,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 90,
+    partCaPct: 99.71
+  },
+  {
+    rang: 150,
+    caCumule: 229050525,
+    totalCA: 229050525,
+    marchands: 150,
+    partMarchandsPct: 100,
+    partCaPct: 100
+  }
+]
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 
+
+=== E4 : clés d'idempotence rejouées et incident ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 03:20:39 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af13c0af8106bb6f820aeea
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> var e4 = [{ $match: { attempts: { $exists: true } } }, { $project: { idempotencyKey: 1, type: 1, amouamount: 1, status: 1, createdAt: 1, tentatives: { $size: "$attempts" }, traitees: { $size: { $filter: { input: "$attempts", as: "a", cond: { $eq: ["$$a.result", "PROCESSED"] } } } }, rejeux: { $size: { $filter: { input: "$attempts", as: "a", cond: { $eq: ["$$a.result","REPLAYED"] } } } }, premier: { $min: "$attempts.at" }, dernier: { $max: "$attempts.at" } } }, { $addFields: { dureeSecondes: { $round: [{ $divide: [{ $subtract: ["$dernier", "$premier"] }, 1000] }, 1] }, montantExpose: { $multiply: ["$amount", "$rejeux"] } } }, {$sort: { createdAt: 1 } }]
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(e4).toArray()
+[
+  {
+    _id: 'T0002220',
+    idempotencyKey: 'idem-eaf0ccc8d43d1e8e',
+    type: 'MERCHANT_PAY',
+    amount: 1300,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-01T10:33:37.415Z'),
+    tentatives: 3,
+    traitees: 1,
+    rejeux: 2,
+    premier: ISODate('2026-01-01T10:33:37.415Z'),
+    dernier: ISODate('2026-01-01T10:34:26.118Z'),
+    dureeSecondes: 48.7,
+    montantExpose: 2600
+  },
+  {
+    _id: 'T0005088',
+    idempotencyKey: 'idem-b0a2ff53cdd81cf8',
+    type: 'MERCHANT_PAY',
+    amount: 10400,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-01-10T10:48:30.439Z'),
+    tentatives: 3,
+    traitees: 1,
+    rejeux: 2,
+    premier: ISODate('2026-01-10T10:48:30.439Z'),
+    dernier: ISODate('2026-01-10T10:49:31.062Z'),
+    dureeSecondes: 60.6,
+    montantExpose: 20800
+  },
+  {
+    _id: 'T0014091',
+    idempotencyKey: 'idem-97ff0c079fc67f59',
+    type: 'MERCHANT_PAY',
+    amount: 53175,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-02-06T19:12:40.479Z'),
+    tentatives: 3,
+    traitees: 1,
+    rejeux: 2,
+    premier: ISODate('2026-02-06T19:12:40.479Z'),
+    dernier: ISODate('2026-02-06T19:12:48.357Z'),
+    dureeSecondes: 7.9,
+    montantExpose: 106350
+  },
+  {
+    _id: 'T0015461',
+    idempotencyKey: 'idem-2b27642244b6d7dd',
+    type: 'P2P',
+    amount: 11950,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-02-12T09:04:44.248Z'),
+    tentatives: 3,
+    traitees: 1,
+    rejeux: 2,
+    premier: ISODate('2026-02-12T09:04:44.248Z'),
+    dernier: ISODate('2026-02-12T09:05:52.727Z'),
+    dureeSecondes: 68.5,
+    montantExpose: 23900
+  },
+  {
+    _id: 'T0028996',
+    idempotencyKey: 'idem-907e56b58f78f71c',
+    type: 'P2P',
+    amount: 4625,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-03-28T17:53:14.935Z'),
+    tentatives: 5,
+    traitees: 1,
+    rejeux: 4,
+    premier: ISODate('2026-03-28T17:53:14.935Z'),
+    dernier: ISODate('2026-03-28T17:54:30.568Z'),
+    dureeSecondes: 75.6,
+    montantExpose: 18500
+  },
+  {
+    _id: 'T0030596',
+    idempotencyKey: 'idem-35edd400935ad7ee',
+    type: 'P2P',
+    amount: 1325,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-03-31T21:59:32.942Z'),
+    tentatives: 4,
+    traitees: 1,
+    rejeux: 3,
+    premier: ISODate('2026-03-31T21:59:32.942Z'),
+    dernier: ISODate('2026-03-31T22:00:15.933Z'),
+    dureeSecondes: 43,
+    montantExpose: 3975
+  },
+  {
+    _id: 'T0033872',
+    idempotencyKey: 'idem-401046a409a4ab48',
+    type: 'P2P',
+    amount: 3625,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T14:09:05.877Z'),
+    tentatives: 6,
+    traitees: 1,
+    rejeux: 5,
+    premier: ISODate('2026-04-10T14:09:05.877Z'),
+    dernier: ISODate('2026-04-10T14:10:50.979Z'),
+    dureeSecondes: 105.1,
+    montantExpose: 18125
+  },
+  {
+    _id: 'T0033873',
+    idempotencyKey: 'idem-265d8f09468b9a58',
+    type: 'MERCHANT_PAY',
+    amount: 31450,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T14:10:45.196Z'),
+    tentatives: 4,
+    traitees: 1,
+    rejeux: 3,
+    premier: ISODate('2026-04-10T14:10:45.196Z'),
+    dernier: ISODate('2026-04-10T14:11:56.792Z'),
+    dureeSecondes: 71.6,
+    montantExpose: 94350
+  },
+  {
+    _id: 'T0033879',
+    idempotencyKey: 'idem-21ba2cbcb8d3b09c',
+    type: 'MERCHANT_PAY',
+    amount: 3200,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T14:49:01.237Z'),
+    tentatives: 2,
+    traitees: 1,
+    rejeux: 1,
+    premier: ISODate('2026-04-10T14:49:01.237Z'),
+    dernier: ISODate('2026-04-10T14:49:31.590Z'),
+    dureeSecondes: 30.4,
+    montantExpose: 3200
+  },
+  {
+    _id: 'T0033881',
+    idempotencyKey: 'idem-adee99d76ecae890',
+    type: 'BILL',
+    amount: 23625,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T14:57:19.399Z'),
+    tentatives: 3,
+    traitees: 1,
+    rejeux: 2,
+    premier: ISODate('2026-04-10T14:57:19.399Z'),
+    dernier: ISODate('2026-04-10T14:57:49.290Z'),
+    dureeSecondes: 29.9,
+    montantExpose: 47250
+  },
+  {
+    _id: 'T0033882',
+    idempotencyKey: 'idem-69d5d2cb495dcdd2',
+    type: 'P2P',
+    amount: 10925,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T15:00:56.511Z'),
+    tentatives: 5,
+    traitees: 1,
+    rejeux: 4,
+    premier: ISODate('2026-04-10T15:00:56.511Z'),
+    dernier: ISODate('2026-04-10T15:02:37.071Z'),
+    dureeSecondes: 100.6,
+    montantExpose: 43700
+  },
+  {
+    _id: 'T0033884',
+    idempotencyKey: 'idem-15db492bc0090e74',
+    type: 'MERCHANT_PAY',
+    amount: 3625,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T15:06:37.798Z'),
+    tentatives: 6,
+    traitees: 1,
+    rejeux: 5,
+    premier: ISODate('2026-04-10T15:06:37.798Z'),
+    dernier: ISODate('2026-04-10T15:08:54.996Z'),
+    dureeSecondes: 137.2,
+    montantExpose: 18125
+  },
+  {
+    _id: 'T0033885',
+    idempotencyKey: 'idem-043356282463e4e1',
+    type: 'BILL',
+    amount: 15925,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T15:11:06.204Z'),
+    tentatives: 6,
+    traitees: 1,
+    rejeux: 5,
+    premier: ISODate('2026-04-10T15:11:06.204Z'),
+    dernier: ISODate('2026-04-10T15:12:54.198Z'),
+    dureeSecondes: 108,
+    montantExpose: 79625
+  },
+  {
+    _id: 'T0033886',
+    idempotencyKey: 'idem-af50294f723db5be',
+    type: 'MERCHANT_PAY',
+    amount: 700,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T15:15:13.371Z'),
+    tentatives: 6,
+    traitees: 1,
+    rejeux: 5,
+    premier: ISODate('2026-04-10T15:15:13.371Z'),
+    dernier: ISODate('2026-04-10T15:16:48.226Z'),
+    dureeSecondes: 94.9,
+    montantExpose: 3500
+  },
+  {
+    _id: 'T0033889',
+    idempotencyKey: 'idem-afe3c2badbe1c1f2',
+    type: 'P2P',
+    amount: 4775,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T15:30:05.016Z'),
+    tentatives: 2,
+    traitees: 1,
+    rejeux: 1,
+    premier: ISODate('2026-04-10T15:30:05.016Z'),
+    dernier: ISODate('2026-04-10T15:30:11.943Z'),
+    dureeSecondes: 6.9,
+    montantExpose: 4775
+  },
+  {
+    _id: 'T0033890',
+    idempotencyKey: 'idem-68f5a9ad1d47c949',
+    type: 'BILL',
+    amount: 6425,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-04-10T15:34:35.900Z'),
+    tentatives: 6,
+    traitees: 1,
+    rejeux: 5,
+    premier: ISODate('2026-04-10T15:34:35.900Z'),
+    dernier: ISODate('2026-04-10T15:36:10.115Z'),
+    dureeSecondes: 94.2,
+    montantExpose: 32125
+  },
+  {
+    _id: 'T0043309',
+    idempotencyKey: 'idem-e505ed3a8bea3a3a',
+    type: 'MERCHANT_PAY',
+    amount: 10325,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-05-09T22:54:20.812Z'),
+    tentatives: 4,
+    traitees: 1,
+    rejeux: 3,
+    premier: ISODate('2026-05-09T22:54:20.812Z'),
+    dernier: ISODate('2026-05-09T22:55:05.289Z'),
+    dureeSecondes: 44.5,
+    montantExpose: 30975
+  },
+  {
+    _id: 'T0045151',
+    idempotencyKey: 'idem-6d8bdba0dc1a300a',
+    type: 'MERCHANT_PAY',
+    amount: 8150,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-05-16T19:29:06.210Z'),
+    tentatives: 4,
+    traitees: 1,
+    rejeux: 3,
+    premier: ISODate('2026-05-16T19:29:06.210Z'),
+    dernier: ISODate('2026-05-16T19:29:25.950Z'),
+    dureeSecondes: 19.7,
+    montantExpose: 24450
+  },
+  {
+    _id: 'T0049876',
+    idempotencyKey: 'idem-38ea123fd5f9da99',
+    type: 'BILL',
+    amount: 15100,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-05-31T06:55:29.285Z'),
+    tentatives: 3,
+    traitees: 1,
+    rejeux: 2,
+    premier: ISODate('2026-05-31T06:55:29.285Z'),
+    dernier: ISODate('2026-05-31T06:56:09.087Z'),
+    dureeSecondes: 39.8,
+    montantExpose: 30200
+  },
+  {
+    _id: 'T0056271',
+    idempotencyKey: 'idem-812905f72664014a',
+    type: 'P2P',
+    amount: 3900,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-06-20T18:17:35.490Z'),
+    tentatives: 5,
+    traitees: 1,
+    rejeux: 4,
+    premier: ISODate('2026-06-20T18:17:35.490Z'),
+    dernier: ISODate('2026-06-20T18:19:53.702Z'),
+    dureeSecondes: 138.2,
+    montantExpose: 15600
+  },
+  {
+    _id: 'T0058177',
+    idempotencyKey: 'idem-04f8d3c4d28dca9d',
+    type: 'P2P',
+    amount: 5450,
+    status: 'COMPLETED',
+    createdAt: ISODate('2026-06-27T08:19:44.993Z'),
+    tentatives: 3,
+    traitees: 1,
+    rejeux: 2,
+    premier: ISODate('2026-06-27T08:19:44.993Z'),
+    dernier: ISODate('2026-06-27T08:20:28.204Z'),
+    dureeSecondes: 43.2,
+    montantExpose: 10900
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(e4.concat([{ $group: { _id: null, cles: { $sum: 1 }, tentatives: { $sum: "$tentatives" }, traitees: { $sum: "$traitees" }, rejeux: { $sum: "$rejeux" }, montantExpose: { $sum: "$montantExpose" } } }]))
+[
+  {
+    _id: null,
+    cles: 21,
+    tentatives: 86,
+    traitees: 21,
+    rejeux: 65,
+    montantExpose: 633025
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { attempts: { $exists: true } } }, { $unwind: "$attempts" }, { $$group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$attempts.at" } }, tentatives: { $sum: 1 }, rejeux: { $sum: { $cond: [{ $e$eq: ["$attempts.result", "REPLAYED"] }, 1, 0] } }, cles: { $addToSet: "$idempotencyKey" } } }, { $project: { tentatives: 1, rejeux: 1, cles: { $size: "$cles" } } }, { $sort: { _id: 1 } }])
+[
+  { _id: '2026-01-01', tentatives: 3, rejeux: 2, cles: 1 },
+  { _id: '2026-01-10', tentatives: 3, rejeux: 2, cles: 1 },
+  { _id: '2026-02-06', tentatives: 3, rejeux: 2, cles: 1 },
+  { _id: '2026-02-12', tentatives: 3, rejeux: 2, cles: 1 },
+  { _id: '2026-03-28', tentatives: 5, rejeux: 4, cles: 1 },
+  { _id: '2026-03-31', tentatives: 4, rejeux: 3, cles: 1 },
+  { _id: '2026-04-10', tentatives: 46, rejeux: 36, cles: 10 },
+  { _id: '2026-05-09', tentatives: 4, rejeux: 3, cles: 1 },
+  { _id: '2026-05-16', tentatives: 4, rejeux: 3, cles: 1 },
+  { _id: '2026-05-31', tentatives: 3, rejeux: 2, cles: 1 },
+  { _id: '2026-06-20', tentatives: 5, rejeux: 4, cles: 1 },
+  { _id: '2026-06-27', tentatives: 3, rejeux: 2, cles: 1 }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { attempts: { $exists: true } } }, { $unwind: "$attempts" }, { $$match: { "attempts.at": { $gte: ISODate("2026-04-10T00:00:00Z"), $lt: ISODate("2026-04-11T00:00:00Z") } } }, { $group: { _id: null, dedebut: { $min: "$attempts.at" }, fin: { $max: "$attempts.at" }, tentatives: { $sum: 1 }, rejeux: { $sum: { $cond: [{ $eq: ["$attempts.result", "REPLAYED"] }, 1, 0] } }, cles: { $addToSet: "$idempotencyKey" } } }, { $project: { _id: 0, debut: 1, fin: 1, tentatives: 1, rerejeux: 1, cles: { $size: "$cles" } } }])
+[
+  {
+    debut: ISODate('2026-04-10T14:09:05.877Z'),
+    fin: ISODate('2026-04-10T15:36:10.115Z'),
+    tentatives: 46,
+    rejeux: 36,
+    cles: 10
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { attempts: { $exists: true } } }, { $unwind: "$attempts" }, { $$match: { "attempts.at": { $gte: ISODate("2026-04-10T00:00:00Z"), $lt: ISODate("2026-04-11T00:00:00Z") } } }, { $group: { _id: { $hour: "$attempts.at" }, tentatives: { $sum: 1 } } }, { $sort: { _id: 1 } }])
+[ { _id: 14, tentatives: 15 }, { _id: 15, tentatives: 31 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $group: { _id: "$idempotencyKey", n: { $sum: 1 } } }, { $group: { _id: "$n", cles: { $sum: 1 } } }])
+[ { _id: 1, cles: 60000 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { attempts: { $exists: true } } }, { $lookup: { from: "ledger_entries", localField: "_id", foreignField: "txId", as: "l" } }, { $group: { _id: { $size: "$l" }, transactions: { $sum: 1 } } }, { $sort: { _id: 1 } }])
+[ { _id: 2, transactions: 8 }, { _id: 3, transactions: 13 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { type: "MERCHANT_PAY" } }, { $setWindowFields: { partitionBy: { w: "$fromWalletId", m: "$merchantId", a: "$amount" }, sortBy: { createdAt: 1 }, output: { precedent: { $shift: { output: "$createdAt", by: -1 } } } } }, { $match: { precedent: { $ne: null }, $expr: { $lt: [{ $subtract: ["$createdAt", "$precedent"] }, 600000] } } }, { $$count: "paiementsEnDoubleSous10min" }])
+
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7>
+
+=== Compléments de l'enquête : dépôts d'ouverture, fuseau horaire (E2, E4), test de détection du contrôle des doublons (E4) ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Mon Nov  9 18:24:32 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af20fe46390e69a77304d50
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { createdAt: { $lt: ISODate("2026-01-01T00:00:00Z") } } }, { $group: { _id: { type: "$type", status: "$status" }, transactions: { $sum: 1 }, montant: { $sum: "$amount" }, wallets: { $addToSet: "$toWalletId" } } }, { $project: { transactions: 1, montant: 1, walletsDiswalletsDistincts: { $size: "$wallets" } } }])
+[
+  {
+    _id: { type: 'CASH_IN', status: 'COMPLETED' },
+    transactions: 2000,
+    montant: 707172575,
+    walletsDistincts: 2000
+  }
+]
+rs0 [direct: primary] fasopay_tp> var ouverture = db.transactions.find({ createdAt: { $lt: ISODate("2026-01-01T00:00:00Z") } }, { _id: 1 }).toArray().map(function (t) {return t._id })
+
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { txId: { $in: ouverture } } }, { $group: { _id: { direction: "$direction", jambeWallet: { $ne:["$walletId", null] } }, lignes: { $sum: 1 }, montant: { $sum: "$amount" } } }, { $sort: { "_id.direction": 1 } }])
+[
+  {
+    _id: { direction: 'CREDIT', jambeWallet: true },
+    lignes: 2000,
+    montant: 707172575
+  },
+  {
+    _id: { direction: 'DEBIT', jambeWallet: false },
+    lignes: 2000,
+    montant: 707172575
+  }
+]
+rs0 [direct: primary] fasopay_tp> var e2tz = function (seuil, minTx) { return [{ $match: { status: "COMPLETED", type: { $in: ["P2P", "CASH_OUT"] }, fromWalletId: { $exis$exists: true } } }, { $lookup: { from: "wallets", localField: "fromWalletId", foreignField: "_id", as: "w" } }, { $unwind: "$w" }, { $match: { $expr: { $and: [{ $gte: ["$amount", { $multiply: ["$w.dailyLimit", seuil] }] }, { $lte: ["$amount", "$w.dailyLimit"] }] } } }, { $group: { _id: { wallet: "$fromWalletId", jour: { $dateToString:{ format: "%Y-%m-%d", date: "$createdAt", timezone: "Africa/Ouagadougou" } } }, transactions: { $sum: 1 }, total: { $sum: "$amount" }, plafond: { $first: "$w.dailyLimit" } } }, { $match: { transactions: { $gte: minTx } } }] }
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate(e2tz(0.9, 3).concat([{ $group: { _id: null, couples: { $sum: 1 }, transactions: { $sum: "$transactions" }, wallets: { $addToSet: "$_id.wallet" } } }, { $project: { _id: 0, couples: 1, transactions: 1, wallets: { $size: "$wallets" } } }]))
+[ { couples: 23, transactions: 121, wallets: 5 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { attempts: { $exists: true } } }, { $unwind: "$attempts" }, { $group: { _id: { $dateToString: { fformat: "%Y-%m-%d", date: "$attempts.at", timezone: "Africa/Ouagadougou" } }, tentatives: { $sum: 1 }, rejeux: { $sum: { $cond: [{ $eq: ["$attempts.result", "REPLAYED"]}, 1, 0] } } } }, { $sort: { _id: 1 } }])
+[
+  { _id: '2026-01-01', tentatives: 3, rejeux: 2 },
+  { _id: '2026-01-10', tentatives: 3, rejeux: 2 },
+  { _id: '2026-02-06', tentatives: 3, rejeux: 2 },
+  { _id: '2026-02-12', tentatives: 3, rejeux: 2 },
+  { _id: '2026-03-28', tentatives: 5, rejeux: 4 },
+  { _id: '2026-03-31', tentatives: 4, rejeux: 3 },
+  { _id: '2026-04-10', tentatives: 46, rejeux: 36 },
+  { _id: '2026-05-09', tentatives: 4, rejeux: 3 },
+  { _id: '2026-05-16', tentatives: 4, rejeux: 3 },
+  { _id: '2026-05-31', tentatives: 3, rejeux: 2 },
+  { _id: '2026-06-20', tentatives: 5, rejeux: 4 },
+  { _id: '2026-06-27', tentatives: 3, rejeux: 2 }
+]
+rs0 [direct: primary] fasopay_tp> var audit = db.getSiblingDB("fasopay_audit")
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { type: "MERCHANT_PAY" } }, { $out: { db: "fasopay_audit", coll: "paiements" } }])
+
+rs0 [direct: primary] fasopay_tp> audit.paiements.countDocuments()
+17989
+rs0 [direct: primary] fasopay_tp> var controle = [{ $setWindowFields: { partitionBy: { w: "$fromWalletId", m: "$merchantId", a: "$amount" }, sortBy: { createdAt: 1 }, output: { precedent: { $shift: { output: "$createdAt", by: -1 } } } } }, { $match: { precedent: { $ne: null }, $expr: { $lt: [{ $subtract: ["$createdAt", "$precedent"] },600000] } } }, { $project: { fromWalletId: 1, merchantId: 1, amount: 1, createdAt: 1, precedent: 1, idempotencyKey: 1 } }]
+
+rs0 [direct: primary] fasopay_tp> audit.paiements.aggregate(controle).toArray()
+[]
+rs0 [direct: primary] fasopay_tp> var orig = audit.paiements.findOne({ _id: "T0003152" }); orig._id = "FAUX_DOUBLON"; orig.idempotencyKey = "idem-faux-doublon"; orig.createdAt = new Date(orig.createdAt.getTime() + 60000); audit.paiements.insertOne(orig)
+{ acknowledged: true, insertedId: 'FAUX_DOUBLON' }
+rs0 [direct: primary] fasopay_tp> audit.paiements.aggregate(controle).toArray()
+[
+  {
+    _id: 'FAUX_DOUBLON',
+    idempotencyKey: 'idem-faux-doublon',
+    fromWalletId: 'W001796',
+    merchantId: 'M00044',
+    amount: 11500,
+    createdAt: ISODate('2026-01-02T18:47:31.850Z'),
+    precedent: ISODate('2026-01-02T18:46:31.850Z')
+  }
+]
+rs0 [direct: primary] fasopay_tp> audit.dropDatabase()
+{ ok: 1, dropped: 'fasopay_audit' }
+rs0 [direct: primary] fasopay_tp> db.getCollectionNames().sort().forEach(function (n) { print(n + " : " + db[n].countDocuments()) })
+customers : 2000
+fraud_alerts : 0
+ledger_entries : 141939
+merchants : 150
+outbox : 0
+transactions : 60000
+wallets : 2000
+
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 

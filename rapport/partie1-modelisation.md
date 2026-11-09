@@ -33,24 +33,26 @@ Le validateur de `ledger_entries` utilise `oneOf` : soit une jambe de wallet (`w
 
 | Relation | Choix | Access pattern | Justification (chiffres) |
 |---|---|---|---|
-| client ↔ wallet | Référence (`wallets.customerId`) | AP1 | 1 wallet par client (2000 clients, 2000 wallets). Un virement lit et écrit le wallet sans toucher au client : le wallet change à chaque transaction, le client presque jamais. |
-| wallet ↔ transactions | Référence | AP1, AP3 | 1939 wallets émettent des transactions, 23,98 en moyenne, maximum 319 ; une transaction concerne deux wallets, elle ne peut pas appartenir à un seul. |
-| transaction ↔ ledger | Référence (collection séparée) | AP1, AP3 | 2 à 6 lignes par transaction (2 : 28 111 ; 3 : 28 093 ; 4 : 121 ; 6 : 159). Le virement écrit les lignes (AP1), l'historique les relit par wallet (AP3) : le ledger est append-only et se lit par wallet, pas seulement par transaction. |
-| marchand ↔ transactions | Référence | AP4 | 150 marchands, 17 989 paiements, 119,9 en moyenne, maximum 4 479 (24,9 % des paiements marchands) : on les lit par marchand et par période. |
-| transaction ↔ `attempts` | Embed | AP2 | Les rejeux d'une même clé se lisent avec la transaction ; seulement 21 transactions en ont, liste courte. |
+| client ↔ wallet | Référence (`wallets.customerId`) | AP1, AP2 | 1 wallet par client (2000 clients, 2000 wallets). Un virement lit et écrit le wallet sans toucher au client : le wallet change à chaque transaction, le client presque jamais. |
+| wallet ↔ transactions | Référence | AP1 | 1939 wallets émettent des transactions, 23,98 en moyenne, maximum 319 ; une transaction concerne deux wallets, elle ne peut pas appartenir à un seul. |
+| transaction ↔ ledger | Référence (collection séparée) | AP1, AP3, AP4 | 2 à 6 lignes par transaction (2 : 28 111 ; 3 : 28 093 ; 4 : 121 ; 6 : 159). Le virement écrit les lignes (AP1), l'historique les relit par wallet (AP3) : le ledger est append-only et se lit par wallet, pas seulement par transaction. |
+| marchand ↔ transactions | Référence | lecture marchand (hors des 4 prioritaires) | 150 marchands, 17 989 paiements, 119,9 en moyenne, maximum 4 479 (24,9 % des paiements marchands) : on les lit par marchand et par période. |
+| transaction ↔ `attempts` | Embed | AP1 (le rejeu) | Les rejeux d'une même clé se lisent avec la transaction ; seulement 21 transactions en ont, liste courte. |
 | transaction ↔ `flags`, marchand ↔ `location` | Embed | aucun dédié | Petits, bornés, toujours lus avec leur document. |
-| ledger ↔ solde (`balanceAfter`) | Hybride (copie) | AP3 | Chaque jambe de wallet garde une copie du solde après l'opération : l'historique du wallet se reconstitue sans tout recalculer. | de wallet garde une copie du solde après l'opération : on reconstitue l'historique sans tout recalculer. |
+| ledger ↔ solde (`balanceAfter`) | Hybride (copie) | AP3, AP4 | Chaque jambe de wallet garde une copie du solde après l'opération : l'historique du wallet se reconstitue sans tout recalculer. |
 
 ## 1.3 Quatre access patterns, par priorité (fréquence × criticité)
 
-La fréquence est une hypothèse de conception, à rapprocher de la Partie 0.
+Les fréquences et les latences cibles sont des hypothèses de conception, que la Partie 0 et le test de charge de la Partie 4 confirmeront ou non.
 
-| Rang | Access pattern | Pourquoi |
-|---|---|---|
-| 1 | Exécuter un virement : lire deux wallets, écrire la transaction, 2 lignes de ledger et l'outbox | Cœur du service (pic cible 1 200 tx/s), argent, critique. |
-| 2 | Retrouver une transaction par `idempotencyKey` | Chaque virement et chaque rejeu y passe : c'est ce qui empêche le doublon. |
-| 3 | Historique d'un wallet trié par date | Lecture la plus fréquente côté clients. |
-| 4 | Transactions d'un marchand sur une période | Règlement et chiffre d'affaires des marchands. |
+| Rang | Access pattern | Nature | Fréquence au pic | Latence cible | Cohérence | Collections et index |
+|---|---|---|---|---|---|---|
+| AP1 | Exécuter un virement ou un paiement (vérification de la clé d'idempotence comprise) | Écriture, transaction multi-documents | jusqu'à 1 200/s | p95 < 300 ms | Forte, idempotente | `transactions` (`uniq_idempotency_key`), `ledger_entries`, `wallets`, `outbox` |
+| AP2 | Consulter son solde (USSD, application) | Lecture par clé | plusieurs milliers/s | p95 < 100 ms | Forte (lecture sur le primary) | `wallets._id` |
+| AP3 | Historique d'un wallet, trié par date, paginé | Lecture par plage | centaines/s | p95 < 150 ms | Éventuelle acceptable | `ledger_entries` (`idx_ledger_wallet_date`) |
+| AP4 | Contrôles de nuit : rapprochement solde / ledger (E1) et plafond journalier (E2) | Lot (batch) | 1 fois par nuit, 3 M wallets | minutes | Photo figée à un instant donné | `ledger_entries` (Q2), `transactions` (`idx_sorties_wallet_jour`, Q1) |
+
+**Priorité.** AP1 est le plus critique : c'est de l'argent, au pic. AP2 est le plus fréquent. AP3 est fréquent mais tolère un léger retard. AP4 est rare, mais c'est lui qui détecte les écarts signalés par le CTO (soldes contestés, découpage sous le plafond). Le contrôle du plafond reste séparé du virement : il alimente `fraud_alerts`. Hors de ces quatre : les transactions d'un marchand sur une période (règlement, chiffre d'affaires), que nous servons par un read model (Partie 7).
 
 ## 1.4 Anti-pattern évité : le ledger embarqué dans le wallet
 
@@ -65,6 +67,15 @@ Les montants sont des entiers en FCFA : pas d'arrondi, un franc ne se divise pas
 Le solde stocké dans `wallets.balance` est un cache du ledger : la vérité est la somme signée des lignes du wallet. Le cache évite de recalculer à chaque lecture. Conséquence : cache et ledger doivent changer ensemble, dans une même transaction multi-documents (Partie 4) ; sinon ils divergent, ce que l'enquête E1 mesure.
 
 Les 70 054 lignes `walletId: null` (champ `account`, valeurs `FEES`, `FLOAT`, `BILLER`, `MERCHANT:…`) sont la contrepartie de l'argent qui ne passe pas par un wallet. Le validateur les accepte.
+
+Le modèle applique les cinq règles d'un grand livre en partie double :
+1. **Montants entiers** : FCFA, jamais de `double`.
+2. **Partie double** : au moins deux lignes par transaction, débits = crédits ; 0 transaction déséquilibrée sur 56 484.
+3. **Ajout seul** : une ligne de ledger n'est jamais modifiée ni supprimée ; une erreur se corrige par une écriture inverse. Nos données le montrent : les 280 transactions `REVERSED` sont exactement celles qui ont 4 lignes (121) ou 6 lignes (159), soit le double des 2 ou 3 lignes d'une transaction normale. Par exemple, le paiement T0002044 (9 325 FCFA chez M00044, frais 196) garde ses 3 lignes d'origine, puis reçoit 38 secondes plus tard 3 lignes inverses de mêmes montants ; le solde de W000344 passe de 171 400 à 180 725 (`preuves/01-mesures-modelisation.txt`, complément).
+4. **Le solde est un cache dérivé** : `wallets.balance` = somme des crédits − somme des débits, et chaque ligne de wallet garde `balanceAfter`.
+5. **Idempotence** : index unique sur `transactions.idempotencyKey` (Partie 3), pour qu'un rejeu ne débite jamais deux fois.
+
+**Patterns de modélisation.** Le solde du wallet et `balanceAfter` relèvent du **Computed pattern** : une valeur pré-calculée, lue sans recalcul, au prix d'une mise à jour à chaque écriture. **Limite :** aucun document ne porte de champ `schemaVersion` (**Schema Versioning**) ; nous l'ajouterions avant toute évolution du schéma en production, pour migrer progressivement sans interruption.
 
 ## 1.6 ADR-001
 
