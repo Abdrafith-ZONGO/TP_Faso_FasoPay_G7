@@ -1,0 +1,423 @@
+=== Partie 5 : test de panne du primary, mode w1 ===
+Déroulement : boucle d'écriture lancée en arrière-plan dans fasopay-client (docker exec -d fasopay-client sh /tmp/code/05-lancer.sh boucle w1),
+puis heure notée (sh /tmp/code/05-lancer.sh panne w1) et arrêt brutal du primary depuis Windows (docker kill <primary>),
+puis redémarrage du nœud tué (docker start <nœud>) ; le journal brut de la boucle et l'analyse suivent.
+
+=== Partie 5 : journal brut de la boucle d'écriture (w1) ===
+Commande : cat /tmp/preuves/05-boucle-w1.log
+Date : Mon Nov  9 21:10:27 UTC 2026
+# journal de la boucle : mode w1, writeConcern {"w":1,"wtimeout":3000}, début 2026-11-09T21:09:34.894Z
+# numéro;heure de début;résultat;durée (ms);erreur
+1;2026-11-09T21:09:34.895Z;ACK;5;
+2;2026-11-09T21:09:35.001Z;ACK;5;
+3;2026-11-09T21:09:35.107Z;ACK;5;
+4;2026-11-09T21:09:35.212Z;ACK;4;
+5;2026-11-09T21:09:35.317Z;ACK;5;
+6;2026-11-09T21:09:35.422Z;ACK;1;
+7;2026-11-09T21:09:35.524Z;ACK;2;
+8;2026-11-09T21:09:35.626Z;ACK;2;
+9;2026-11-09T21:09:35.727Z;ACK;2;
+10;2026-11-09T21:09:35.828Z;ACK;2;
+11;2026-11-09T21:09:35.931Z;ACK;2;
+12;2026-11-09T21:09:36.033Z;ACK;2;
+13;2026-11-09T21:09:36.136Z;ACK;2;
+14;2026-11-09T21:09:36.238Z;ACK;1;
+15;2026-11-09T21:09:36.340Z;ACK;2;
+16;2026-11-09T21:09:36.443Z;ACK;7;
+17;2026-11-09T21:09:36.550Z;ACK;2;
+18;2026-11-09T21:09:36.652Z;ACK;2;
+19;2026-11-09T21:09:36.754Z;ACK;2;
+20;2026-11-09T21:09:36.857Z;ACK;7;
+21;2026-11-09T21:09:36.965Z;ACK;8;
+22;2026-11-09T21:09:37.074Z;ACK;2;
+23;2026-11-09T21:09:37.177Z;ACK;2;
+24;2026-11-09T21:09:37.280Z;ACK;1;
+25;2026-11-09T21:09:37.381Z;ACK;2;
+26;2026-11-09T21:09:37.484Z;ACK;1;
+27;2026-11-09T21:09:37.585Z;ACK;10;
+28;2026-11-09T21:09:37.695Z;ACK;7;
+29;2026-11-09T21:09:37.803Z;ACK;4;
+30;2026-11-09T21:09:37.909Z;ACK;1;
+31;2026-11-09T21:09:38.010Z;ACK;4;
+32;2026-11-09T21:09:38.116Z;ACK;5;
+33;2026-11-09T21:09:38.221Z;ACK;4;
+34;2026-11-09T21:09:38.325Z;ACK;1;
+35;2026-11-09T21:09:38.427Z;ACK;2;
+36;2026-11-09T21:09:38.530Z;ACK;2;
+37;2026-11-09T21:09:38.633Z;ACK;2;
+38;2026-11-09T21:09:38.735Z;ACK;2;
+39;2026-11-09T21:09:38.837Z;ACK;2;
+40;2026-11-09T21:09:38.939Z;ACK;1;
+41;2026-11-09T21:09:39.040Z;ACK;1;
+42;2026-11-09T21:09:39.141Z;ACK;8;
+43;2026-11-09T21:09:39.250Z;ACK;2;
+44;2026-11-09T21:09:39.352Z;ACK;3;
+45;2026-11-09T21:09:39.457Z;ACK;2;
+46;2026-11-09T21:09:39.560Z;ACK;8;
+47;2026-11-09T21:09:39.669Z;ACK;2;
+48;2026-11-09T21:09:39.771Z;ACK;2;
+49;2026-11-09T21:09:39.873Z;ACK;9;
+50;2026-11-09T21:09:39.983Z;ACK;2;
+51;2026-11-09T21:09:40.085Z;ACK;2;
+52;2026-11-09T21:09:40.187Z;ACK;1;
+53;2026-11-09T21:09:40.288Z;ACK;2;
+54;2026-11-09T21:09:40.391Z;ACK;3;
+55;2026-11-09T21:09:40.495Z;ACK;2;
+56;2026-11-09T21:09:40.597Z;ACK;2;
+57;2026-11-09T21:09:40.699Z;ACK;2;
+58;2026-11-09T21:09:40.801Z;ACK;2;
+59;2026-11-09T21:09:40.903Z;ACK;2;
+60;2026-11-09T21:09:41.006Z;ACK;2;
+61;2026-11-09T21:09:41.108Z;ACK;2;
+62;2026-11-09T21:09:41.210Z;ACK;1;
+63;2026-11-09T21:09:41.311Z;ACK;2;
+64;2026-11-09T21:09:41.413Z;ACK;2;
+65;2026-11-09T21:09:41.515Z;ACK;2;
+66;2026-11-09T21:09:41.619Z;ACK;2;
+67;2026-11-09T21:09:41.721Z;ACK;2;
+68;2026-11-09T21:09:41.823Z;ACK;3;
+69;2026-11-09T21:09:41.927Z;ACK;1;
+70;2026-11-09T21:09:42.029Z;ACK;2;
+71;2026-11-09T21:09:42.132Z;ACK;4;
+72;2026-11-09T21:09:42.237Z;ACK;4;
+73;2026-11-09T21:09:42.342Z;ACK;3;
+74;2026-11-09T21:09:42.446Z;ACK;5;
+75;2026-11-09T21:09:42.552Z;ACK;5;
+76;2026-11-09T21:09:42.658Z;ACK;4;
+77;2026-11-09T21:09:42.763Z;ACK;3;
+78;2026-11-09T21:09:42.866Z;ACK;1;
+79;2026-11-09T21:09:42.968Z;ACK;3;
+80;2026-11-09T21:09:43.072Z;ACK;4;
+81;2026-11-09T21:09:43.177Z;ACK;2;
+82;2026-11-09T21:09:43.279Z;ACK;5;
+83;2026-11-09T21:09:43.385Z;ACK;1;
+84;2026-11-09T21:09:43.487Z;ACK;1;
+85;2026-11-09T21:09:43.589Z;ACK;1;
+86;2026-11-09T21:09:43.691Z;ACK;3;
+87;2026-11-09T21:09:43.795Z;ACK;2;
+88;2026-11-09T21:09:43.899Z;ACK;4;
+89;2026-11-09T21:09:44.007Z;ACK;2;
+90;2026-11-09T21:09:44.109Z;ACK;2;
+91;2026-11-09T21:09:44.211Z;ACK;2;
+92;2026-11-09T21:09:44.313Z;ACK;2;
+93;2026-11-09T21:09:44.415Z;ACK;2;
+94;2026-11-09T21:09:44.517Z;ACK;2;
+95;2026-11-09T21:09:44.619Z;ACK;2;
+96;2026-11-09T21:09:44.722Z;ACK;1;
+97;2026-11-09T21:09:44.824Z;ACK;2;
+98;2026-11-09T21:09:44.926Z;ACK;2;
+99;2026-11-09T21:09:45.029Z;ACK;1;
+100;2026-11-09T21:09:45.130Z;ACK;2;
+101;2026-11-09T21:09:45.233Z;ACK;3;
+102;2026-11-09T21:09:45.336Z;ACK;1;
+103;2026-11-09T21:09:45.438Z;ACK;2;
+104;2026-11-09T21:09:45.540Z;ACK;2;
+105;2026-11-09T21:09:45.642Z;ACK;1;
+106;2026-11-09T21:09:45.744Z;ACK;1;
+107;2026-11-09T21:09:45.846Z;ACK;1;
+108;2026-11-09T21:09:45.947Z;ACK;1;
+109;2026-11-09T21:09:46.049Z;ACK;2;
+110;2026-11-09T21:09:46.151Z;ACK;2;
+111;2026-11-09T21:09:46.253Z;ACK;2;
+112;2026-11-09T21:09:46.355Z;ACK;2;
+113;2026-11-09T21:09:46.457Z;ACK;2;
+114;2026-11-09T21:09:46.560Z;ACK;3;
+115;2026-11-09T21:09:46.663Z;ACK;2;
+116;2026-11-09T21:09:46.765Z;ACK;2;
+117;2026-11-09T21:09:46.867Z;ACK;3;
+118;2026-11-09T21:09:46.970Z;ACK;2;
+119;2026-11-09T21:09:47.072Z;ACK;3;
+120;2026-11-09T21:09:47.175Z;ACK;2;
+121;2026-11-09T21:09:47.278Z;ACK;2;
+122;2026-11-09T21:09:47.380Z;ACK;2;
+123;2026-11-09T21:09:47.482Z;ACK;4;
+124;2026-11-09T21:09:47.586Z;ACK;2;
+125;2026-11-09T21:09:47.689Z;ACK;2;
+126;2026-11-09T21:09:47.793Z;ACK;1;
+127;2026-11-09T21:09:47.895Z;ACK;2;
+128;2026-11-09T21:09:47.997Z;ACK;2;
+129;2026-11-09T21:09:48.100Z;ACK;2;
+130;2026-11-09T21:09:48.203Z;ACK;2;
+131;2026-11-09T21:09:48.305Z;ACK;2;
+132;2026-11-09T21:09:48.409Z;ACK;2;
+133;2026-11-09T21:09:48.511Z;ACK;1;
+134;2026-11-09T21:09:48.613Z;ACK;2;
+135;2026-11-09T21:09:48.715Z;ACK;2;
+136;2026-11-09T21:09:48.817Z;ACK;1;
+137;2026-11-09T21:09:48.919Z;ACK;2;
+138;2026-11-09T21:09:49.022Z;ACK;1;
+139;2026-11-09T21:09:49.124Z;ACK;4;
+140;2026-11-09T21:09:49.229Z;ACK;3;
+141;2026-11-09T21:09:49.332Z;ACK;2;
+142;2026-11-09T21:09:49.434Z;ACK;2;
+143;2026-11-09T21:09:49.536Z;ACK;2;
+144;2026-11-09T21:09:49.638Z;ACK;2;
+145;2026-11-09T21:09:49.740Z;ACK;2;
+146;2026-11-09T21:09:49.842Z;ACK;2;
+147;2026-11-09T21:09:49.943Z;ACK;2;
+148;2026-11-09T21:09:50.045Z;ACK;1;
+149;2026-11-09T21:09:50.147Z;ACK;3;
+150;2026-11-09T21:09:50.251Z;ACK;2;
+151;2026-11-09T21:09:50.353Z;ACK;3;
+152;2026-11-09T21:09:50.457Z;ACK;2;
+153;2026-11-09T21:09:50.560Z;ACK;1;
+154;2026-11-09T21:09:50.662Z;ACK;1;
+155;2026-11-09T21:09:50.763Z;ACK;3;
+156;2026-11-09T21:09:50.867Z;ACK;4;
+157;2026-11-09T21:09:50.971Z;ACK;3;
+158;2026-11-09T21:09:51.074Z;ACK;2;
+159;2026-11-09T21:09:51.177Z;ACK;1;
+160;2026-11-09T21:09:51.279Z;ACK;2;
+161;2026-11-09T21:09:51.381Z;ACK;2;
+162;2026-11-09T21:09:51.483Z;ACK;3;
+163;2026-11-09T21:09:51.586Z;ACK;3;
+164;2026-11-09T21:09:51.689Z;ACK;2;
+165;2026-11-09T21:09:51.791Z;ACK;1;
+166;2026-11-09T21:09:51.892Z;ACK;2;
+167;2026-11-09T21:09:51.995Z;ACK;6;
+168;2026-11-09T21:09:52.102Z;ACK;2;
+169;2026-11-09T21:09:52.205Z;ACK;2;
+170;2026-11-09T21:09:52.307Z;ACK;1;
+171;2026-11-09T21:09:52.409Z;ACK;1;
+172;2026-11-09T21:09:52.510Z;ACK;1;
+173;2026-11-09T21:09:52.612Z;ACK;3;
+174;2026-11-09T21:09:52.715Z;ACK;2;
+175;2026-11-09T21:09:52.817Z;ACK;2;
+176;2026-11-09T21:09:52.920Z;ACK;4;
+177;2026-11-09T21:09:53.024Z;ACK;2;
+178;2026-11-09T21:09:53.126Z;ACK;2;
+179;2026-11-09T21:09:53.228Z;ACK;3;
+180;2026-11-09T21:09:53.331Z;ACK;5;
+181;2026-11-09T21:09:53.439Z;ACK;1;
+182;2026-11-09T21:09:53.541Z;ACK;1;
+183;2026-11-09T21:09:53.642Z;ECHEC;3;NotWritablePrimary not primary
+184;2026-11-09T21:09:53.745Z;ECHEC;2;NotWritablePrimary not primary
+185;2026-11-09T21:09:53.848Z;ECHEC;2;NotWritablePrimary not primary
+186;2026-11-09T21:09:53.951Z;ECHEC;11;NotWritablePrimary not primary
+187;2026-11-09T21:09:54.063Z;ECHEC;4;NotWritablePrimary not primary
+188;2026-11-09T21:09:54.168Z;ECHEC;2;NotWritablePrimary not primary
+189;2026-11-09T21:09:54.271Z;ECHEC;2;NotWritablePrimary not primary
+190;2026-11-09T21:09:54.374Z;ECHEC;3;NotWritablePrimary not primary
+191;2026-11-09T21:09:54.480Z;ECHEC;2;NotWritablePrimary not primary
+192;2026-11-09T21:09:54.583Z;ECHEC;5;NotWritablePrimary not primary
+193;2026-11-09T21:09:54.689Z;ECHEC;2;NotWritablePrimary not primary
+194;2026-11-09T21:09:54.791Z;ECHEC;2;NotWritablePrimary not primary
+195;2026-11-09T21:09:54.894Z;ECHEC;4;NotWritablePrimary not primary
+196;2026-11-09T21:09:54.998Z;ECHEC;6;NotWritablePrimary not primary
+197;2026-11-09T21:09:55.104Z;ECHEC;4;NotWritablePrimary not primary
+198;2026-11-09T21:09:55.208Z;ECHEC;5;NotWritablePrimary not primary
+199;2026-11-09T21:09:55.313Z;ECHEC;1;NotWritablePrimary not primary
+200;2026-11-09T21:09:55.415Z;ECHEC;3;NotWritablePrimary not primary
+201;2026-11-09T21:09:55.518Z;ECHEC;4;NotWritablePrimary not primary
+202;2026-11-09T21:09:55.622Z;ECHEC;2;NotWritablePrimary not primary
+203;2026-11-09T21:09:55.724Z;ECHEC;2;NotWritablePrimary not primary
+204;2026-11-09T21:09:55.826Z;ECHEC;3;NotWritablePrimary not primary
+205;2026-11-09T21:09:55.929Z;ECHEC;3;NotWritablePrimary not primary
+206;2026-11-09T21:09:56.032Z;ECHEC;2;NotWritablePrimary not primary
+207;2026-11-09T21:09:56.134Z;ECHEC;3;NotWritablePrimary not primary
+208;2026-11-09T21:09:56.238Z;ECHEC;2;NotWritablePrimary not primary
+209;2026-11-09T21:09:56.340Z;ECHEC;2;NotWritablePrimary not primary
+210;2026-11-09T21:09:56.442Z;ECHEC;2;NotWritablePrimary not primary
+211;2026-11-09T21:09:56.545Z;ECHEC;4;NotWritablePrimary not primary
+212;2026-11-09T21:09:56.649Z;ECHEC;3;NotWritablePrimary not primary
+213;2026-11-09T21:09:56.752Z;ECHEC;2;NotWritablePrimary not primary
+214;2026-11-09T21:09:56.854Z;ECHEC;2;NotWritablePrimary not primary
+215;2026-11-09T21:09:56.956Z;ECHEC;2;NotWritablePrimary not primary
+216;2026-11-09T21:09:57.058Z;ECHEC;2;NotWritablePrimary not primary
+217;2026-11-09T21:09:57.160Z;ECHEC;3;NotWritablePrimary not primary
+218;2026-11-09T21:09:57.264Z;ECHEC;2;NotWritablePrimary not primary
+219;2026-11-09T21:09:57.367Z;ECHEC;3;NotWritablePrimary not primary
+220;2026-11-09T21:09:57.470Z;ECHEC;2;NotWritablePrimary not primary
+221;2026-11-09T21:09:57.573Z;ECHEC;2;NotWritablePrimary not primary
+222;2026-11-09T21:09:57.676Z;ECHEC;2;NotWritablePrimary not primary
+223;2026-11-09T21:09:57.779Z;ECHEC;2;NotWritablePrimary not primary
+224;2026-11-09T21:09:57.881Z;ECHEC;2;NotWritablePrimary not primary
+225;2026-11-09T21:09:57.983Z;ECHEC;2;NotWritablePrimary not primary
+226;2026-11-09T21:09:58.086Z;ECHEC;2;NotWritablePrimary not primary
+227;2026-11-09T21:09:58.188Z;ECHEC;2;NotWritablePrimary not primary
+228;2026-11-09T21:09:58.291Z;ECHEC;3;NotWritablePrimary not primary
+229;2026-11-09T21:09:58.395Z;ECHEC;7;NotWritablePrimary not primary
+230;2026-11-09T21:09:58.503Z;ECHEC;3;NotWritablePrimary not primary
+231;2026-11-09T21:09:58.606Z;ECHEC;2;NotWritablePrimary not primary
+232;2026-11-09T21:09:58.708Z;ECHEC;3;NotWritablePrimary not primary
+233;2026-11-09T21:09:58.811Z;ECHEC;2;NotWritablePrimary not primary
+234;2026-11-09T21:09:58.913Z;ECHEC;4;NotWritablePrimary not primary
+235;2026-11-09T21:09:59.017Z;ECHEC;2;NotWritablePrimary not primary
+236;2026-11-09T21:09:59.121Z;ECHEC;2;NotWritablePrimary not primary
+237;2026-11-09T21:09:59.223Z;ECHEC;3;NotWritablePrimary not primary
+238;2026-11-09T21:09:59.326Z;ECHEC;3;NotWritablePrimary not primary
+239;2026-11-09T21:09:59.429Z;ECHEC;1;NotWritablePrimary not primary
+240;2026-11-09T21:09:59.531Z;ECHEC;3;NotWritablePrimary not primary
+241;2026-11-09T21:09:59.636Z;ECHEC;4;NotWritablePrimary not primary
+242;2026-11-09T21:09:59.741Z;ECHEC;5;NotWritablePrimary not primary
+243;2026-11-09T21:09:59.846Z;ECHEC;1;NotWritablePrimary not primary
+244;2026-11-09T21:09:59.948Z;ECHEC;3;NotWritablePrimary not primary
+245;2026-11-09T21:10:00.052Z;ECHEC;5;NotWritablePrimary not primary
+246;2026-11-09T21:10:00.158Z;ECHEC;12;NotWritablePrimary not primary
+247;2026-11-09T21:10:00.271Z;ECHEC;3;NotWritablePrimary not primary
+248;2026-11-09T21:10:00.375Z;ECHEC;2;NotWritablePrimary not primary
+249;2026-11-09T21:10:00.477Z;ECHEC;3;NotWritablePrimary not primary
+250;2026-11-09T21:10:00.580Z;ECHEC;2;NotWritablePrimary not primary
+251;2026-11-09T21:10:00.683Z;ECHEC;2;NotWritablePrimary not primary
+252;2026-11-09T21:10:00.786Z;ECHEC;4;NotWritablePrimary not primary
+253;2026-11-09T21:10:00.890Z;ECHEC;2;NotWritablePrimary not primary
+254;2026-11-09T21:10:00.992Z;ECHEC;2;NotWritablePrimary not primary
+255;2026-11-09T21:10:01.095Z;ECHEC;2;NotWritablePrimary not primary
+256;2026-11-09T21:10:01.198Z;ECHEC;3;NotWritablePrimary not primary
+257;2026-11-09T21:10:01.302Z;ECHEC;5;NotWritablePrimary not primary
+258;2026-11-09T21:10:01.409Z;ECHEC;9;NotWritablePrimary not primary
+259;2026-11-09T21:10:01.519Z;ECHEC;2;NotWritablePrimary not primary
+260;2026-11-09T21:10:01.622Z;ECHEC;2;NotWritablePrimary not primary
+261;2026-11-09T21:10:01.724Z;ECHEC;2;NotWritablePrimary not primary
+262;2026-11-09T21:10:01.826Z;ECHEC;1;NotWritablePrimary not primary
+263;2026-11-09T21:10:01.928Z;ECHEC;2;NotWritablePrimary not primary
+264;2026-11-09T21:10:02.030Z;ECHEC;2;NotWritablePrimary not primary
+265;2026-11-09T21:10:02.133Z;ECHEC;6;NotWritablePrimary not primary
+266;2026-11-09T21:10:02.240Z;ECHEC;2;NotWritablePrimary not primary
+267;2026-11-09T21:10:02.342Z;ECHEC;3;NotWritablePrimary not primary
+268;2026-11-09T21:10:02.445Z;ECHEC;7;NotWritablePrimary not primary
+269;2026-11-09T21:10:02.552Z;ECHEC;2;NotWritablePrimary not primary
+270;2026-11-09T21:10:02.655Z;ECHEC;4;NotWritablePrimary not primary
+271;2026-11-09T21:10:02.761Z;ECHEC;9;NotWritablePrimary not primary
+272;2026-11-09T21:10:02.871Z;ECHEC;2;NotWritablePrimary not primary
+273;2026-11-09T21:10:02.973Z;ECHEC;2;NotWritablePrimary not primary
+274;2026-11-09T21:10:03.076Z;ECHEC;2;NotWritablePrimary not primary
+275;2026-11-09T21:10:03.179Z;ECHEC;15;NotWritablePrimary not primary
+276;2026-11-09T21:10:03.295Z;ECHEC;2;NotWritablePrimary not primary
+277;2026-11-09T21:10:03.398Z;ECHEC;2;NotWritablePrimary not primary
+278;2026-11-09T21:10:03.501Z;ECHEC;2;NotWritablePrimary not primary
+279;2026-11-09T21:10:03.603Z;ECHEC;2;NotWritablePrimary not primary
+280;2026-11-09T21:10:03.705Z;ECHEC;2;NotWritablePrimary not primary
+281;2026-11-09T21:10:03.807Z;ECHEC;3;NotWritablePrimary not primary
+282;2026-11-09T21:10:03.910Z;ECHEC;5;NotWritablePrimary not primary
+283;2026-11-09T21:10:04.015Z;ECHEC;2;NotWritablePrimary not primary
+284;2026-11-09T21:10:04.117Z;ECHEC;2;NotWritablePrimary not primary
+285;2026-11-09T21:10:04.219Z;ECHEC;1;NotWritablePrimary not primary
+286;2026-11-09T21:10:04.321Z;ECHEC;2;NotWritablePrimary not primary
+287;2026-11-09T21:10:04.424Z;ECHEC;4;NotWritablePrimary not primary
+288;2026-11-09T21:10:04.528Z;ECHEC;5;NotWritablePrimary not primary
+289;2026-11-09T21:10:04.633Z;ECHEC;3;NotWritablePrimary not primary
+290;2026-11-09T21:10:04.736Z;ECHEC;2;NotWritablePrimary not primary
+291;2026-11-09T21:10:04.839Z;ECHEC;11;NotWritablePrimary not primary
+292;2026-11-09T21:10:04.951Z;ECHEC;4;NotWritablePrimary not primary
+293;2026-11-09T21:10:05.056Z;ECHEC;5;NotWritablePrimary not primary
+294;2026-11-09T21:10:05.162Z;ECHEC;4;NotWritablePrimary not primary
+295;2026-11-09T21:10:05.266Z;ECHEC;3;NotWritablePrimary not primary
+296;2026-11-09T21:10:05.369Z;ECHEC;2;NotWritablePrimary not primary
+297;2026-11-09T21:10:05.471Z;ECHEC;9;NotWritablePrimary not primary
+298;2026-11-09T21:10:05.580Z;ECHEC;2;NotWritablePrimary not primary
+299;2026-11-09T21:10:05.681Z;ECHEC;3;NotWritablePrimary not primary
+300;2026-11-09T21:10:05.785Z;ECHEC;3;NotWritablePrimary not primary
+301;2026-11-09T21:10:05.888Z;ECHEC;2;NotWritablePrimary not primary
+302;2026-11-09T21:10:05.989Z;ECHEC;3;NotWritablePrimary not primary
+303;2026-11-09T21:10:06.092Z;ECHEC;3;NotWritablePrimary not primary
+304;2026-11-09T21:10:06.194Z;ECHEC;4;NotWritablePrimary not primary
+305;2026-11-09T21:10:06.299Z;ECHEC;2;NotWritablePrimary not primary
+306;2026-11-09T21:10:06.402Z;ECHEC;2;NotWritablePrimary not primary
+307;2026-11-09T21:10:06.504Z;ECHEC;3;NotWritablePrimary not primary
+308;2026-11-09T21:10:06.606Z;ECHEC;3;NotWritablePrimary not primary
+309;2026-11-09T21:10:06.708Z;ECHEC;2;NotWritablePrimary not primary
+310;2026-11-09T21:10:06.810Z;ECHEC;3;NotWritablePrimary not primary
+311;2026-11-09T21:10:06.914Z;ECHEC;2;NotWritablePrimary not primary
+312;2026-11-09T21:10:07.017Z;ECHEC;3;NotWritablePrimary not primary
+313;2026-11-09T21:10:07.120Z;ECHEC;6;NotWritablePrimary not primary
+314;2026-11-09T21:10:07.227Z;ECHEC;3;NotWritablePrimary not primary
+315;2026-11-09T21:10:07.332Z;ECHEC;4;NotWritablePrimary not primary
+316;2026-11-09T21:10:07.437Z;ECHEC;3;NotWritablePrimary not primary
+317;2026-11-09T21:10:07.541Z;ECHEC;5;NotWritablePrimary not primary
+318;2026-11-09T21:10:07.647Z;ECHEC;3;NotWritablePrimary not primary
+319;2026-11-09T21:10:07.751Z;ECHEC;8;NotWritablePrimary not primary
+320;2026-11-09T21:10:07.860Z;ECHEC;1;NotWritablePrimary not primary
+321;2026-11-09T21:10:07.962Z;ECHEC;6;NotWritablePrimary not primary
+322;2026-11-09T21:10:08.067Z;ECHEC;3;NotWritablePrimary not primary
+323;2026-11-09T21:10:08.171Z;ECHEC;2;NotWritablePrimary not primary
+324;2026-11-09T21:10:08.272Z;ECHEC;3;NotWritablePrimary not primary
+325;2026-11-09T21:10:08.376Z;ECHEC;2;NotWritablePrimary not primary
+326;2026-11-09T21:10:08.477Z;ECHEC;4;NotWritablePrimary not primary
+327;2026-11-09T21:10:08.582Z;ECHEC;1;NotWritablePrimary not primary
+328;2026-11-09T21:10:08.685Z;ECHEC;9;NotWritablePrimary not primary
+329;2026-11-09T21:10:08.795Z;ECHEC;3;NotWritablePrimary not primary
+330;2026-11-09T21:10:08.899Z;ECHEC;3;NotWritablePrimary not primary
+331;2026-11-09T21:10:09.002Z;ECHEC;3;NotWritablePrimary not primary
+332;2026-11-09T21:10:09.105Z;ECHEC;3;NotWritablePrimary not primary
+333;2026-11-09T21:10:09.207Z;ECHEC;4;NotWritablePrimary not primary
+334;2026-11-09T21:10:09.311Z;ECHEC;2;NotWritablePrimary not primary
+335;2026-11-09T21:10:09.415Z;ECHEC;2;NotWritablePrimary not primary
+336;2026-11-09T21:10:09.517Z;ECHEC;4;NotWritablePrimary not primary
+337;2026-11-09T21:10:09.622Z;ECHEC;2;NotWritablePrimary not primary
+338;2026-11-09T21:10:09.724Z;ECHEC;3;NotWritablePrimary not primary
+339;2026-11-09T21:10:09.826Z;ECHEC;3;NotWritablePrimary not primary
+340;2026-11-09T21:10:09.929Z;ECHEC;2;NotWritablePrimary not primary
+341;2026-11-09T21:10:10.032Z;ECHEC;2;NotWritablePrimary not primary
+342;2026-11-09T21:10:10.133Z;ECHEC;3;NotWritablePrimary not primary
+343;2026-11-09T21:10:10.236Z;ECHEC;4;NotWritablePrimary not primary
+344;2026-11-09T21:10:10.341Z;ECHEC;3;NotWritablePrimary not primary
+345;2026-11-09T21:10:10.444Z;ECHEC;3;NotWritablePrimary not primary
+346;2026-11-09T21:10:10.546Z;ECHEC;2;NotWritablePrimary not primary
+347;2026-11-09T21:10:10.649Z;ECHEC;2;NotWritablePrimary not primary
+348;2026-11-09T21:10:10.751Z;ECHEC;2;NotWritablePrimary not primary
+349;2026-11-09T21:10:10.854Z;ECHEC;1;NotWritablePrimary not primary
+350;2026-11-09T21:10:10.956Z;ECHEC;1;NotWritablePrimary not primary
+351;2026-11-09T21:10:11.058Z;ECHEC;2;NotWritablePrimary not primary
+352;2026-11-09T21:10:11.160Z;ECHEC;5;NotWritablePrimary not primary
+353;2026-11-09T21:10:11.265Z;ECHEC;2;NotWritablePrimary not primary
+354;2026-11-09T21:10:11.368Z;ECHEC;2;NotWritablePrimary not primary
+355;2026-11-09T21:10:11.469Z;ECHEC;3;NotWritablePrimary not primary
+356;2026-11-09T21:10:11.571Z;ECHEC;5;NotWritablePrimary not primary
+357;2026-11-09T21:10:11.676Z;ECHEC;4;NotWritablePrimary not primary
+358;2026-11-09T21:10:11.780Z;ECHEC;2;NotWritablePrimary not primary
+359;2026-11-09T21:10:11.882Z;ECHEC;2;NotWritablePrimary not primary
+360;2026-11-09T21:10:11.984Z;ECHEC;4;NotWritablePrimary not primary
+361;2026-11-09T21:10:12.089Z;ECHEC;3;NotWritablePrimary not primary
+362;2026-11-09T21:10:12.193Z;ECHEC;7;NotWritablePrimary not primary
+363;2026-11-09T21:10:12.300Z;ECHEC;2;NotWritablePrimary not primary
+364;2026-11-09T21:10:12.403Z;ECHEC;2;NotWritablePrimary not primary
+365;2026-11-09T21:10:12.504Z;ECHEC;2;NotWritablePrimary not primary
+366;2026-11-09T21:10:12.606Z;ECHEC;2;NotWritablePrimary not primary
+367;2026-11-09T21:10:12.709Z;ECHEC;2;NotWritablePrimary not primary
+368;2026-11-09T21:10:12.811Z;ECHEC;2;NotWritablePrimary not primary
+369;2026-11-09T21:10:12.912Z;ECHEC;7;NotWritablePrimary not primary
+370;2026-11-09T21:10:13.020Z;ECHEC;2;NotWritablePrimary not primary
+371;2026-11-09T21:10:13.122Z;ECHEC;3;NotWritablePrimary not primary
+372;2026-11-09T21:10:13.224Z;ECHEC;6;NotWritablePrimary not primary
+373;2026-11-09T21:10:13.331Z;ECHEC;3;NotWritablePrimary not primary
+374;2026-11-09T21:10:13.434Z;ECHEC;2;NotWritablePrimary not primary
+375;2026-11-09T21:10:13.537Z;ECHEC;2;NotWritablePrimary not primary
+376;2026-11-09T21:10:13.640Z;ECHEC;2;NotWritablePrimary not primary
+377;2026-11-09T21:10:13.742Z;ECHEC;3;NotWritablePrimary not primary
+378;2026-11-09T21:10:13.846Z;ECHEC;5;NotWritablePrimary not primary
+379;2026-11-09T21:10:13.951Z;ECHEC;4;NotWritablePrimary not primary
+380;2026-11-09T21:10:14.054Z;ECHEC;3;NotWritablePrimary not primary
+381;2026-11-09T21:10:14.157Z;ECHEC;2;NotWritablePrimary not primary
+382;2026-11-09T21:10:14.260Z;ECHEC;3;NotWritablePrimary not primary
+383;2026-11-09T21:10:14.363Z;ECHEC;2;NotWritablePrimary not primary
+384;2026-11-09T21:10:14.466Z;ECHEC;2;NotWritablePrimary not primary
+385;2026-11-09T21:10:14.568Z;ECHEC;2;NotWritablePrimary not primary
+386;2026-11-09T21:10:14.671Z;ECHEC;1;NotWritablePrimary not primary
+387;2026-11-09T21:10:14.773Z;ECHEC;2;NotWritablePrimary not primary
+388;2026-11-09T21:10:14.875Z;ECHEC;2;NotWritablePrimary not primary
+FIN 2026-11-09T21:10:14.978Z
+
+=== Partie 5 : analyse du journal et comptage en base (w1) ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/?replicaSet=rs-fasopay&serverSelectionTimeoutMS=2000" --quiet --eval "load('/tmp/code/05-boucle.js'); analyser('w1')"
+Date : Mon Nov  9 21:10:27 UTC 2026
+écritures tentées : 388 ; acquittées (ACK) : 182 ; échouées : 206
+heure de la panne (juste avant docker kill) : 2026-11-09T21:09:43.457Z
+plus longue interruption des écritures acquittées : 0.11 s, entre l'écriture n° 26 (acquittée à 2026-11-09T21:09:37.485Z) et la n° 27 (acquittée à 2026-11-09T21:09:37.595Z)
+dernière écriture acquittée avant la panne : n° 83 à 2026-11-09T21:09:43.386Z
+première écriture acquittée après la panne : n° 84 à 2026-11-09T21:09:43.488Z, soit 0.03 s après la panne
+primary actuel : fasopay-noeud3:27017
+élection du nouveau primary : raison electionTimeout, date 2026-11-09T21:09:54.433Z, mandat 4, soit 10.98 s après la panne ; écritures majoritaires possibles à 2026-11-09T21:10:06.458Z (23.00 s après la panne)
+documents en base pour ce mode : 85
+écritures acquittées absentes de la base : 97 (n° 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182)
+écritures signalées en échec mais présentes en base : 0
+  fasopay-noeud1:27017 (SECONDARY) : 85 documents
+  fasopay-noeud2:27017 (SECONDARY) : 85 documents
+  fasopay-noeud3:27017 (PRIMARY) : 85 documents
+
+=== Partie 5 : état du Replica Set après le retour du nœud ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/?replicaSet=rs-fasopay&serverSelectionTimeoutMS=2000" --quiet --eval "rs.status().members.forEach(function (m) { print(m.name + ' : ' + m.stateStr + ', santé ' + m.health + ', optime ' + m.optimeDate.toISOString()) })"
+Date : Mon Nov  9 21:10:28 UTC 2026
+fasopay-noeud1:27017 : SECONDARY, santé 1, optime 2026-11-09T21:10:25.000Z
+fasopay-noeud2:27017 : SECONDARY, santé 1, optime 2026-11-09T21:10:25.000Z
+fasopay-noeud3:27017 : PRIMARY, santé 1, optime 2026-11-09T21:10:25.000Z

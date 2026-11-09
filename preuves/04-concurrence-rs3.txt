@@ -1,0 +1,113 @@
+
+=== Partie 4 sur le Replica Set à 3 nœuds : état des membres pendant le test ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --eval "rs.status().members.forEach(function (m) { print(m.name + ' : ' + m.stateStr) }); print('majorité d écriture : ' + rs.status().writeMajorityCount)"
+Date : Mon Nov  9 21:35:53 UTC 2026
+fasopay-noeud1:27017 : SECONDARY
+fasopay-noeud2:27017 : SECONDARY
+fasopay-noeud3:27017 : PRIMARY
+majorité d écriture : 2
+
+=== Partie 4 : préparation de la base de test fasopay_test ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --file /tmp/code/04-base-test.js
+Date : Mon Nov  9 21:35:53 UTC 2026
+base : fasopay_test
+collections : ["ledger_entries","outbox","transactions","wallets"]
+index de transactions : ["_id_","uniq_idempotency_key"]
+  W_A : 100000 FCFA, ACTIVE
+  W_B : 0 FCFA, ACTIVE
+  W_CONC : 3000 FCFA, ACTIVE
+  W_CONC_DEST : 0 FCFA, ACTIVE
+  W_GEL : 50000 FCFA, FROZEN
+  W_LU : 3000 FCFA, ACTIVE
+  W_MC : 10000 FCFA, ACTIVE
+  W_MC_DEST : 0 FCFA, ACTIVE
+  W_PETIT : 500 FCFA, ACTIVE
+
+=== Partie 4 : préparation du test de concurrence ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --eval "load('/tmp/code/04-concurrence.js'); preparer()"
+Date : Mon Nov  9 21:35:54 UTC 2026
+préparé : W_CONC = 3000, W_CONC_DEST = 0, W_MC = 10000, W_MC_DEST = 0 ; départ commun à 2026-11-09T21:36:00.607Z
+
+=== Partie 4 : deux clients lancés en même temps (deux processus mongosh en parallèle) ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --eval "load('/tmp/code/04-concurrence.js'); client('A')" > /tmp/preuves/client-A.log 2>&1 & mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --eval "load('/tmp/code/04-concurrence.js'); client('B')" > /tmp/preuves/client-B.log 2>&1 & wait
+Date : Mon Nov  9 21:35:54 UTC 2026
+--- sortie du client A ---
+client A : départ à 2026-11-09T21:36:00.611Z
+2026-11-09T21:36:00.685Z | A | cle-commune-1 | {"ok":true,"replay":true,"txId":"T6af23cc0835359416046e53f","status":"COMPLETED"}
+2026-11-09T21:36:00.685Z | A | conc-A-01 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.703Z | A | conc-A-02 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.716Z | A | conc-A-03 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.728Z | A | conc-A-04 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.739Z | A | conc-A-05 | ACCEPTÉ | essais=2
+2026-11-09T21:36:00.782Z | A | conc-A-06 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.793Z | A | conc-A-07 | ACCEPTÉ | essais=4
+2026-11-09T21:36:00.908Z | A | conc-A-08 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.921Z | A | conc-A-09 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.932Z | A | conc-A-10 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.944Z | A | conc-A-11 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.954Z | A | conc-A-12 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.964Z | A | conc-A-13 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.975Z | A | conc-A-14 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:00.983Z | A | conc-A-15 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:00.990Z | A | conc-A-16 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:00.996Z | A | conc-A-17 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.003Z | A | conc-A-18 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.009Z | A | conc-A-19 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.015Z | A | conc-A-20 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.021Z | A | conc-A-21 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.027Z | A | conc-A-22 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.037Z | A | conc-A-23 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.050Z | A | conc-A-24 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.059Z | A | conc-A-25 | INSUFFICIENT_FUNDS | essais=1
+client A : fin à 2026-11-09T21:36:01.067Z ; acceptés=13, refusés=12, erreurs=0, virements rejoués après un conflit=2
+--- sortie du client B ---
+client B : départ à 2026-11-09T21:36:00.608Z
+2026-11-09T21:36:00.639Z | B | cle-commune-1 | {"ok":true,"replay":false,"txId":"T6af23cc0835359416046e53f"}
+2026-11-09T21:36:00.639Z | B | conc-B-01 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.652Z | B | conc-B-02 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.663Z | B | conc-B-03 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.676Z | B | conc-B-04 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.689Z | B | conc-B-05 | ACCEPTÉ | essais=2
+2026-11-09T21:36:00.751Z | B | conc-B-06 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.762Z | B | conc-B-07 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.774Z | B | conc-B-08 | ACCEPTÉ | essais=2
+2026-11-09T21:36:00.804Z | B | conc-B-09 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.815Z | B | conc-B-10 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.827Z | B | conc-B-11 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.838Z | B | conc-B-12 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.850Z | B | conc-B-13 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.860Z | B | conc-B-14 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.871Z | B | conc-B-15 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.883Z | B | conc-B-16 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.892Z | B | conc-B-17 | ACCEPTÉ | essais=1
+2026-11-09T21:36:00.902Z | B | conc-B-18 | INSUFFICIENT_FUNDS | essais=3
+2026-11-09T21:36:01.002Z | B | conc-B-19 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.009Z | B | conc-B-20 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.015Z | B | conc-B-21 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.022Z | B | conc-B-22 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.028Z | B | conc-B-23 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.033Z | B | conc-B-24 | INSUFFICIENT_FUNDS | essais=1
+2026-11-09T21:36:01.045Z | B | conc-B-25 | INSUFFICIENT_FUNDS | essais=1
+client B : fin à 2026-11-09T21:36:01.055Z ; acceptés=17, refusés=8, erreurs=0, virements rejoués après un conflit=3
+
+=== Partie 4 : vérification des invariants ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --eval "load('/tmp/code/04-concurrence.js'); verifier()"
+Date : Mon Nov  9 21:36:01 UTC 2026
+client A : {"_id":"client-A","acceptes":13,"refuses":12,"erreurs":0,"rejoues":2,"cleCommune":{"ok":true,"replay":true,"txId":"T6af23cc0835359416046e53f","status":"COMPLETED"}}
+client B : {"_id":"client-B","acceptes":17,"refuses":8,"erreurs":0,"rejoues":3,"cleCommune":{"ok":true,"replay":false,"txId":"T6af23cc0835359416046e53f"}}
+
+virements acceptés en base : 30 ; W_CONC = 0 ; W_CONC_DEST = 3000 ; lignes de ledger = 60 ; outbox = 30 ; plus petit balanceAfter de W_CONC = 0
+OK     exactement 30 virements acceptés (en base, et selon les clients : 30)
+OK     20 refus INSUFFICIENT_FUNDS côté clients, aucune erreur
+OK     solde final jamais négatif : W_CONC = 0, aucun balanceAfter < 0
+OK     monnaie conservée : W_CONC + W_CONC_DEST = 3000 (3000 au départ)
+OK     ledger = 2 × virements : 60 = 2 × 30
+OK     outbox = virements : 30 = 30
+OK     les deux clients ont vraiment travaillé en même temps (conflits réglés par des réessais : 5)
+
+même clé : A a reçu {"ok":true,"replay":true,"txId":"T6af23cc0835359416046e53f","status":"COMPLETED"} ; B a reçu {"ok":true,"replay":false,"txId":"T6af23cc0835359416046e53f"}
+OK     même clé envoyée par 2 clients : 1 seul document transactions
+OK     W_MC débité une seule fois : 9500 (10000 - 500), W_MC_DEST = 500
+OK     les deux clients ont reçu le même txId
+
+RÉSULTAT : 10 vérifications OK, 0 en échec

@@ -1,0 +1,184 @@
+
+=== Partie 4 sur le Replica Set à 3 nœuds : état des membres pendant le test ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --eval "rs.status().members.forEach(function (m) { print(m.name + ' : ' + m.stateStr) }); print('majorité d écriture : ' + rs.status().writeMajorityCount)"
+Date : Mon Nov  9 21:35:44 UTC 2026
+fasopay-noeud1:27017 : SECONDARY
+fasopay-noeud2:27017 : SECONDARY
+fasopay-noeud3:27017 : PRIMARY
+majorité d écriture : 2
+
+=== Partie 4 : préparation de la base de test fasopay_test ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --file /tmp/code/04-base-test.js
+Date : Mon Nov  9 21:35:45 UTC 2026
+base : fasopay_test
+collections : ["ledger_entries","outbox","transactions","wallets"]
+index de transactions : ["_id_","uniq_idempotency_key"]
+  W_A : 100000 FCFA, ACTIVE
+  W_B : 0 FCFA, ACTIVE
+  W_CONC : 3000 FCFA, ACTIVE
+  W_CONC_DEST : 0 FCFA, ACTIVE
+  W_GEL : 50000 FCFA, FROZEN
+  W_LU : 3000 FCFA, ACTIVE
+  W_MC : 10000 FCFA, ACTIVE
+  W_MC_DEST : 0 FCFA, ACTIVE
+  W_PETIT : 500 FCFA, ACTIVE
+
+=== Partie 4 : tests de transfer() (chargement, succès, 3 rejeux, refus, abort prouvé, réponse perdue) ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/fasopay_test?replicaSet=rs-fasopay" --quiet --file /tmp/code/04-tests.js
+Date : Mon Nov  9 21:35:45 UTC 2026
+
+==================== TEST 0 : le chargement de transfer.js n'a aucun effet ====================
+avant : {"transactions":0,"ledger_entries":0,"outbox":0,"W_A":100000,"W_B":0,"W_PETIT":500,"W_GEL":50000} ["ledger_entries","outbox","transactions","wallets"]
+après : {"transactions":0,"ledger_entries":0,"outbox":0,"W_A":100000,"W_B":0,"W_PETIT":500,"W_GEL":50000} ["ledger_entries","outbox","transactions","wallets"]
+OK     même nombre de documents, mêmes soldes, mêmes collections après load()
+OK     la fonction transfer est définie
+
+==================== TEST 1 : virement réussi de 1 500 FCFA de W_A vers W_B ====================
+avant : {"transactions":0,"ledger_entries":0,"outbox":0,"W_A":100000,"W_B":0,"W_PETIT":500,"W_GEL":50000}
+réponse : {"ok":true,"replay":false,"txId":"T6af23cb26976eca8af995a90"}
+après : {"transactions":1,"ledger_entries":2,"outbox":1,"W_A":98500,"W_B":1500,"W_PETIT":500,"W_GEL":50000}
+document transactions :
+{
+  _id: 'T6af23cb26976eca8af995a90',
+  idempotencyKey: 'test-succes-1',
+  type: 'P2P',
+  fromWalletId: 'W_A',
+  toWalletId: 'W_B',
+  amount: 1500,
+  fee: 0,
+  status: 'COMPLETED',
+  channel: 'APP',
+  createdAt: ISODate('2026-11-09T21:35:46.464Z'),
+  completedAt: ISODate('2026-11-09T21:35:46.464Z'),
+  riskScore: 0,
+  flags: []
+}
+lignes de ledger :
+{
+  _id: 'T6af23cb26976eca8af995a90-D',
+  txId: 'T6af23cb26976eca8af995a90',
+  walletId: 'W_A',
+  direction: 'DEBIT',
+  amount: 1500,
+  balanceAfter: 98500,
+  createdAt: ISODate('2026-11-09T21:35:46.464Z')
+}
+{
+  _id: 'T6af23cb26976eca8af995a90-C',
+  txId: 'T6af23cb26976eca8af995a90',
+  walletId: 'W_B',
+  direction: 'CREDIT',
+  amount: 1500,
+  balanceAfter: 1500,
+  createdAt: ISODate('2026-11-09T21:35:46.464Z')
+}
+document outbox :
+{
+  _id: 'T6af23cb26976eca8af995a90',
+  type: 'TRANSFER_COMPLETED',
+  txId: 'T6af23cb26976eca8af995a90',
+  status: 'PENDING',
+  createdAt: ISODate('2026-11-09T21:35:46.464Z')
+}
+wallets :
+{
+  _id: 'W_A',
+  balance: 98500,
+  version: 1,
+  updatedAt: ISODate('2026-11-09T21:35:46.464Z')
+}
+{
+  _id: 'W_B',
+  balance: 1500,
+  version: 1,
+  updatedAt: ISODate('2026-11-09T21:35:46.464Z')
+}
+OK     réponse { ok: true, replay: false, txId }
+OK     +1 transaction, +2 lignes de ledger, +1 outbox
+OK     W_A débité de 1 500 et W_B crédité de 1 500
+OK     balanceAfter = nouveau solde (débit et crédit)
+OK     statut final COMPLETED, outbox TRANSFER_COMPLETED / PENDING
+type BSON stocké : amount (transactions) = int, amount (ledger) = int, balance (wallets) = int
+OK     les montants sont stockés en entiers (int), jamais en double
+
+==================== TEST 2 : idempotence, 1 appel puis 3 rejeux de la même clé (2 000 FCFA) ====================
+avant : {"transactions":1,"ledger_entries":2,"outbox":1,"W_A":98500,"W_B":1500,"W_PETIT":500,"W_GEL":50000}
+appel 1 : {"ok":true,"replay":false,"txId":"T6af23cb26976eca8af995a91"}
+appel 2 (rejeu) : {"ok":true,"replay":true,"txId":"T6af23cb26976eca8af995a91","status":"COMPLETED"}
+appel 3 (rejeu) : {"ok":true,"replay":true,"txId":"T6af23cb26976eca8af995a91","status":"COMPLETED"}
+appel 4 (rejeu) : {"ok":true,"replay":true,"txId":"T6af23cb26976eca8af995a91","status":"COMPLETED"}
+après : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
+OK     1 seul document transactions pour cette clé
+OK     +1 transaction, +2 lignes de ledger, +1 outbox au total (pas 4)
+OK     W_A débité une seule fois (2 000, pas 8 000)
+OK     les 3 rejeux renvoient la même réponse, avec le même txId que l'appel 1
+
+==================== TEST 3 : refus, aucune écriture ne doit survivre ====================
+- montant non entier (12.5) : {"ok":false,"error":"INVALID_AMOUNT"}
+OK       refus INVALID_AMOUNT, état identique avant / après, clé absente de transactions
+- montant en texte ("100") : {"ok":false,"error":"INVALID_AMOUNT"}
+OK       refus INVALID_AMOUNT, état identique avant / après, clé absente de transactions
+- montant nul (0) : {"ok":false,"error":"INVALID_AMOUNT"}
+OK       refus INVALID_AMOUNT, état identique avant / après, clé absente de transactions
+- montant négatif (-100) : {"ok":false,"error":"INVALID_AMOUNT"}
+OK       refus INVALID_AMOUNT, état identique avant / après, clé absente de transactions
+- virement vers soi-même : {"ok":false,"error":"INVALID_AMOUNT"}
+OK       refus INVALID_AMOUNT, état identique avant / après, clé absente de transactions
+- wallet émetteur inexistant : {"ok":false,"error":"WALLET_NOT_FOUND_OR_FROZEN"}
+OK       refus WALLET_NOT_FOUND_OR_FROZEN, état identique avant / après, clé absente de transactions
+- wallet émetteur FROZEN : {"ok":false,"error":"WALLET_NOT_FOUND_OR_FROZEN"}
+OK       refus WALLET_NOT_FOUND_OR_FROZEN, état identique avant / après, clé absente de transactions
+- wallet destinataire FROZEN (débit déjà fait, puis annulé) : {"ok":false,"error":"WALLET_NOT_FOUND_OR_FROZEN"}
+OK       refus WALLET_NOT_FOUND_OR_FROZEN, état identique avant / après, clé absente de transactions
+- wallet destinataire inexistant (débit déjà fait, puis annulé) : {"ok":false,"error":"WALLET_NOT_FOUND_OR_FROZEN"}
+OK       refus WALLET_NOT_FOUND_OR_FROZEN, état identique avant / après, clé absente de transactions
+- solde insuffisant (1 000 sur un solde de 500) : {"ok":false,"error":"INSUFFICIENT_FUNDS"}
+OK       refus INSUFFICIENT_FUNDS, état identique avant / après, clé absente de transactions
+état après tous les refus : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
+
+==================== TEST 4 : abort prouvé (failAfterFirstWrite) ====================
+avant : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
+compteurs du serveur avant : démarrées=7, validées=2, annulées=5
+pendant la transaction, juste après la première écriture :
+  lu DANS la transaction : {"_id":"T6af23cb26976eca8af995a97","idempotencyKey":"test-abort-1","type":"P2P","fromWalletId":"W_A","toWalletId":"W_B","amount":777,"fee":0,"status":"COMPLETED","channel":"APP","createdAt":"2026-11-09T21:35:46.750Z","completedAt":"2026-11-09T21:35:46.750Z","riskScore":0,"flags":[]}
+  lu HORS de la transaction : null
+réponse : {"ok":false,"error":"CRASH_SIMULATED"}
+après : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
+compteurs du serveur après : démarrées=8, validées=2, annulées=6
+trace du profileur (insertion dans transactions pendant le test) :
+{
+  op: 'insert',
+  ns: 'fasopay_test.transactions',
+  command: {
+    txnNumber: Long('8'),
+    autocommit: false,
+    startTransaction: true
+  },
+  ninserted: 1,
+  keysInserted: 2,
+  ts: ISODate('2026-11-09T21:35:46.750Z')
+}
+OK     l'écriture a eu lieu : le document est lu DANS la transaction
+OK     isolation : HORS de la transaction, il est invisible
+OK     réponse { ok: false, error: "CRASH_SIMULATED" }
+OK     après l'abort, le document a disparu
+OK     comptages et soldes identiques avant / après
+OK     le serveur compte une transaction annulée de plus
+
+==================== TEST 5 : la réponse est perdue, le client réessaie avec la même clé ====================
+avant : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
+(réponse que le client n'a pas reçue : {"ok":true,"replay":false,"txId":"T6af23cb26976eca8af995a98"})
+réponse au réessai : {"ok":true,"replay":true,"txId":"T6af23cb26976eca8af995a98","status":"COMPLETED"}
+après : {"transactions":3,"ledger_entries":6,"outbox":3,"W_A":96200,"W_B":3800,"W_PETIT":500,"W_GEL":50000}
+OK     le réessai est reconnu comme un rejeu, avec le même txId
+OK     W_A débité une seule fois (300)
+
+==================== BILAN ====================
+OK     wallets : 9 documents, 0 invalide(s) pour nos validateurs
+OK     transactions : 3 documents, 0 invalide(s) pour nos validateurs
+OK     ledger_entries : 6 documents, 0 invalide(s) pour nos validateurs
+OK     outbox : 3 documents, 0 invalide(s) pour nos validateurs
+OK     argent conservé : 150500 FCFA au départ, 150500 à la fin
+OK     partie double : 0 transaction déséquilibrée dans le ledger
+
+RÉSULTAT : 36 vérifications OK, 0 en échec

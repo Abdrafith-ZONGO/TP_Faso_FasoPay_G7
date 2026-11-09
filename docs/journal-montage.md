@@ -704,3 +704,160 @@ docker cp mongo-rs1:/tmp/preuves/04-debit.txt preuves/04-debit.txt
 ```
 
 Résultat : avec 1 client, 1 000 virements en 7,98 s, soit 125,3 virements/s (752 écritures de documents/s), p95 à 10 ms. Avec 4 clients en parallèle, 999 virements acceptés sur 1 000 en 3,03 s, soit 329,7 virements/s (1 978 écritures/s), p95 à 17 ms et p99 à 35 ms, 6 conflits rejoués. La somme des soldes reste égale à 832251836 FCFA. Preuve : `preuves/04-debit.txt` (date `Mon Nov  9 19:59:57 UTC 2026`).
+
+## 18. Replica Set à 3 nœuds (Partie 5)
+
+Objectif : monter un second environnement, distinct de `mongo-rs1` (qui garde `fasopay_tp` et les preuves des parties 0 à 4) : un Replica Set `rs-fasopay` de trois nœuds, chacun dans son conteneur, sur un réseau Docker dédié. Aucun port n'est publié vers Windows : le client qui écrit pendant les tests tournera lui aussi dans un conteneur de ce réseau (voir plus bas, « Résolution des noms »).
+
+### 18.1 Réseau et nœuds
+
+Création du réseau :
+
+```powershell
+docker network create reseau-fasopay
+```
+
+Démarrage des trois nœuds :
+
+```powershell
+docker run -d --name fasopay-noeud1 --network reseau-fasopay -v fasopay-noeud1-data:/data/db mongo:8.0 --replSet rs-fasopay --bind_ip_all --wiredTigerCacheSizeGB 0.25
+docker run -d --name fasopay-noeud2 --network reseau-fasopay -v fasopay-noeud2-data:/data/db mongo:8.0 --replSet rs-fasopay --bind_ip_all --wiredTigerCacheSizeGB 0.25
+docker run -d --name fasopay-noeud3 --network reseau-fasopay -v fasopay-noeud3-data:/data/db mongo:8.0 --replSet rs-fasopay --bind_ip_all --wiredTigerCacheSizeGB 0.25
+```
+
+Rôle de chaque morceau :
+
+| Morceau | Rôle |
+|---|---|
+| `docker network create reseau-fasopay` | réseau privé où chaque conteneur est joignable par son nom (`fasopay-noeud1`, etc.) |
+| `--network reseau-fasopay` | branche le conteneur sur ce réseau |
+| `-v fasopay-noeudX-data:/data/db` | un volume par nœud : chacun garde sa propre copie des données, même si le conteneur est supprimé |
+| `--replSet rs-fasopay` | démarre `mongod` en mode Replica Set, avec le même nom sur les trois nœuds |
+| `--bind_ip_all` | accepte les connexions venant des autres conteneurs du réseau |
+| `--wiredTigerCacheSizeGB 0.25` | limite le cache à 0,25 Go par nœud, pour que les conteneurs tiennent dans la mémoire donnée à Docker |
+
+Les noms désignent un nœud, pas un rôle : après une panne, le primary change de nœud, un nom comme « primary » deviendrait faux.
+
+Vérification :
+
+```powershell
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Networks}}"
+docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}"
+```
+
+Résultat : `fasopay-noeud1`, `fasopay-noeud2` et `fasopay-noeud3` sont « Up » sur `reseau-fasopay`, à côté de `mongo-rs1`. Chaque nœud occupe environ 100 Mo au démarrage (93,6 à 102,3 Mo) sur 7,6 Go visibles par Docker.
+
+### 18.2 Initialisation du Replica Set et preuve des trois membres
+
+Initialisation, avec les trois membres annoncés par leur nom sur le réseau Docker (et non `localhost`, comme pour `mongo-rs1`, puisque les nœuds doivent se joindre entre eux) :
+
+```powershell
+docker exec fasopay-noeud1 mongosh --quiet --eval "rs.initiate({_id: 'rs-fasopay', members: [{_id: 0, host: 'fasopay-noeud1:27017'}, {_id: 1, host: 'fasopay-noeud2:27017'}, {_id: 2, host: 'fasopay-noeud3:27017'}]})"
+```
+
+Résultat : `ok: 1`.
+
+Copie du code dans le nœud 1, puis écriture de la preuve par le script `code/05-lancer.sh` (mode `status`), et récupération :
+
+```powershell
+docker cp code/. fasopay-noeud1:/tmp/code/
+docker exec fasopay-noeud1 sh /tmp/code/05-lancer.sh status
+docker cp fasopay-noeud1:/tmp/preuves/05-rs-status.txt preuves/05-rs-status.txt
+```
+
+Résultat : `fasopay-noeud1` PRIMARY, `fasopay-noeud2` et `fasopay-noeud3` SECONDARY, tous en santé 1 et au même optime ; 3 membres votants, majorité d'écriture de 2 (`writeMajorityCount: 2`, contre 1 sur `mongo-rs1`) ; élection du premier primary à 20:50:52 (`electionTimeoutMillis` de 10 000 ms). Preuve : `preuves/05-rs-status.txt` (date `Mon Nov  9 20:51:05 UTC 2026`).
+
+### 18.3 Panne du primary avec `w: "majority"`
+
+Objectif : écrire en continu pendant 90 s (une écriture toutes les 100 ms, `w: "majority"`), tuer brutalement le primary pendant la boucle, le redémarrer, puis vérifier qu'aucune écriture acquittée n'a été perdue.
+
+**Résolution des noms (indice `ENOTFOUND` de l'énoncé).** Les membres s'annoncent par leur nom sur le réseau Docker (`fasopay-noeud1:27017`, etc.), que Windows ne sait pas résoudre. Nous avons choisi de lancer le client dans un conteneur à part, `fasopay-client`, branché sur `reseau-fasopay` : il résout les noms grâce au DNS interne de Docker, il survit à la panne du primary puisqu'il ne tourne sur aucun nœud, et rien n'est modifié sur la machine Windows. L'autre solution, ajouter les trois noms au fichier `hosts` de Windows et publier un port par nœud, demande des droits administrateur et modifie la machine.
+
+Création du client, copie du code, puis déroulement du test :
+
+```powershell
+docker run -d --name fasopay-client --network reseau-fasopay mongo:8.0 sleep infinity
+docker cp code/. fasopay-client:/tmp/code/
+docker exec fasopay-client sh /tmp/code/05-lancer.sh primaire
+docker exec -d fasopay-client sh /tmp/code/05-lancer.sh boucle majority
+docker exec fasopay-client sh /tmp/code/05-lancer.sh panne majority; docker kill fasopay-noeud1
+docker exec fasopay-client sh /tmp/code/05-lancer.sh attendre majority
+docker start fasopay-noeud1
+docker exec fasopay-client sh /tmp/code/05-lancer.sh analyse majority
+docker cp fasopay-client:/tmp/preuves/05-failover-majority.txt preuves/05-failover.txt
+```
+
+Rôle de chaque morceau :
+
+| Morceau | Rôle |
+|---|---|
+| `docker run ... mongo:8.0 sleep infinity` | conteneur client qui ne lance pas de serveur : il attend nos commandes, avec `mongosh` disponible |
+| `docker exec -d ...` | lance la boucle en arrière-plan : la main revient tout de suite pour pouvoir provoquer la panne |
+| `05-lancer.sh panne majority` | note l'heure exacte (UTC, à la milliseconde) juste avant la panne |
+| `docker kill fasopay-noeud1` | arrêt brutal du primary (signal KILL, sans arrêt propre) |
+| `docker start fasopay-noeud1` | redémarre le nœud tué, qui revient comme secondary et rattrape son retard |
+
+Résultat : 637 écritures tentées, 627 acquittées, 10 échouées (erreurs de sélection de serveur pendant l'absence de primary). Panne notée à 20:56:09.053 ; `fasopay-noeud3` élu primary à 20:56:20.375, soit 11,32 s après ; plus longue interruption des écritures acquittées : 21,17 s (entre les écritures n° 93 et n° 104). 0 écriture acquittée absente de la base, 0 écriture en échec présente en base ; après le retour de `fasopay-noeud1` (SECONDARY), les trois nœuds ont chacun 627 documents. Preuve : `preuves/05-failover.txt` (date `Mon Nov  9 20:57:49 UTC 2026`).
+
+### 18.4 Même panne, client qui surveille les nœuds toutes les secondes
+
+Objectif : vérifier pourquoi l'interruption (21,2 s) a duré près du double de l'élection (11,3 s). Hypothèse : le pilote du client ne vérifie l'état des nœuds que toutes les 10 s par défaut (`heartbeatFrequencyMS`) et découvre donc le nouveau primary avec retard. Même test, avec `heartbeatFrequencyMS=1000` ajouté à la chaîne de connexion (mode `majority-hb1` de `05-lancer.sh`) ; le primary était alors `fasopay-noeud3`.
+
+```powershell
+docker cp code/. fasopay-client:/tmp/code/
+docker exec fasopay-client sh /tmp/code/05-lancer.sh primaire
+docker exec -d fasopay-client sh /tmp/code/05-lancer.sh boucle majority-hb1
+docker exec fasopay-client sh /tmp/code/05-lancer.sh panne majority-hb1; docker kill fasopay-noeud3
+docker exec fasopay-client sh /tmp/code/05-lancer.sh attendre majority-hb1
+docker start fasopay-noeud3
+docker exec fasopay-client sh /tmp/code/05-lancer.sh analyse majority-hb1
+docker cp fasopay-client:/tmp/preuves/05-failover-majority-hb1.txt preuves/05-failover-hb1.txt
+```
+
+Résultat : 742 écritures tentées, 737 acquittées, 5 échouées ; `fasopay-noeud2` élu 10,31 s après la panne ; plus longue interruption 10,62 s, la première écriture acquittée arrivant 0,44 s après l'élection (contre près de 10 s au premier test). L'hypothèse est confirmée. 0 écriture acquittée perdue ; 737 documents sur chacun des trois nœuds. Preuve : `preuves/05-failover-hb1.txt` (date `Mon Nov  9 21:05:32 UTC 2026`).
+
+### 18.5 Coupure réseau du primary avec `w: 1` : écritures acquittées puis annulées (rollback)
+
+Objectif : montrer ce qu'on peut perdre avec `w: 1`. La boucle écrit avec `w: 1` directement sur le primary (alors `fasopay-noeud2`), depuis son propre conteneur, pour rester joignable même coupé du réseau. Le primary n'est pas tué : il est débranché du réseau, si bien qu'il continue un moment à acquitter des écritures que personne ne recopie, pendant que les deux autres nœuds élisent un nouveau primary. Puis il est rebranché.
+
+```powershell
+docker cp code/. fasopay-noeud2:/tmp/code/
+docker cp code/. fasopay-client:/tmp/code/
+docker exec fasopay-client sh /tmp/code/05-lancer.sh primaire
+docker exec -d fasopay-noeud2 sh /tmp/code/05-lancer.sh boucle-locale w1
+docker exec fasopay-noeud2 sh /tmp/code/05-lancer.sh panne w1; docker network disconnect reseau-fasopay fasopay-noeud2
+docker exec fasopay-noeud2 sh /tmp/code/05-lancer.sh attendre w1
+docker network connect reseau-fasopay fasopay-noeud2
+docker exec fasopay-noeud2 sh /tmp/code/05-lancer.sh analyse w1
+docker exec fasopay-noeud2 sh /tmp/code/05-lancer.sh rollback w1
+docker cp fasopay-noeud2:/tmp/preuves/05-failover-w1.txt preuves/05-failover-w1.txt
+docker cp fasopay-noeud2:/tmp/preuves/05-rollback.txt preuves/05-rollback.txt
+```
+
+Rôle des nouvelles commandes :
+
+| Morceau | Rôle |
+|---|---|
+| `05-lancer.sh boucle-locale w1` | boucle `w: 1` connectée directement au nœud local (`localhost`, `directConnection=true`) |
+| `docker network disconnect reseau-fasopay fasopay-noeud2` | coupe le primary du réseau sans l'arrêter : il se croit encore primary |
+| `docker network connect reseau-fasopay fasopay-noeud2` | le rebranche : il découvre le nouveau primary et annule ses écritures non recopiées |
+| `05-lancer.sh rollback w1` | liste les fichiers de `/data/db/rollback`, les lit avec `bsondump` et les compare au journal de la boucle |
+
+Résultat : coupure notée à 21:09:43.457. L'ancien primary acquitte encore les écritures jusqu'à la n° 182 (21:09:53.5), puis refuse (`NotWritablePrimary`) à partir de 21:09:53.6, soit environ 10 s après la coupure ; `fasopay-noeud3` est élu à 21:09:54.433 (10,98 s après). Sur 182 écritures acquittées, 97 (n° 86 à 182) sont absentes de la base après le retour du nœud ; les 97 se trouvent dans le fichier `/data/db/rollback/441d9fa9-0ec8-4ff6-b071-ddd54aaed8b4/removed.2026-11-09T21-10-18.0.bson` (5 030 octets) de `fasopay-noeud2`, et le journal du serveur indique « Operations reverted by rollback » avec 97 insertions, puis le retour en SECONDARY. Les trois nœuds ont 85 documents de ce mode. Preuves : `preuves/05-failover-w1.txt` (date `Mon Nov  9 21:10:27 UTC 2026`) et `preuves/05-rollback.txt` (date `Mon Nov  9 21:10:36 UTC 2026`).
+
+Remarque : l'en-tête « Déroulement » de `05-failover-w1.txt` reprend le texte générique du test `docker kill` ; pour ce test, le déroulement réel est celui décrit ci-dessus (coupure réseau). Le script `05-lancer.sh` a été corrigé ensuite pour écrire le bon déroulement en mode `w1`.
+
+### 18.6 Tests de la Partie 4 rejoués sur le Replica Set à 3 nœuds
+
+Objectif : rejouer les tests de `transfer()` là où `w: "majority"` attend réellement deux nœuds (sur `mongo-rs1`, à un nœud, il équivaut à `w: 1`). Le script `04-lancer.sh` accepte pour cela l'option `rs3` : la base `fasopay_test` est alors créée sur `rs-fasopay`, depuis le conteneur client, et chaque preuve commence par l'état des membres.
+
+```powershell
+docker cp code/. fasopay-client:/tmp/code/
+docker exec fasopay-client sh /tmp/code/04-lancer.sh tests rs3
+docker exec fasopay-client sh /tmp/code/04-lancer.sh concurrence rs3
+docker cp fasopay-client:/tmp/preuves/04-transaction-rs3.txt preuves/04-transaction-rs3.txt
+docker cp fasopay-client:/tmp/preuves/04-concurrence-rs3.txt preuves/04-concurrence-rs3.txt
+```
+
+Résultat : pendant les deux séries, `fasopay-noeud3` est PRIMARY, les deux autres SECONDARY, majorité d'écriture de 2. Tests du contrat : 36 vérifications OK sur 36. Concurrence : 10 vérifications OK sur 10 (30 virements acceptés, 13 pour le client A et 17 pour le client B, solde final 0, monnaie conservée, ledger = 60, outbox = 30, 5 conflits rejoués ; même clé envoyée par les deux clients : un seul virement). Preuves : `preuves/04-transaction-rs3.txt` (date `Mon Nov  9 21:35:44 UTC 2026`) et `preuves/04-concurrence-rs3.txt` (date `Mon Nov  9 21:35:53 UTC 2026`).
+

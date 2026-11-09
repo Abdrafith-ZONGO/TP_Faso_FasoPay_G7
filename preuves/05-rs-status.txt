@@ -1,0 +1,138 @@
+
+=== Partie 5 : état du Replica Set rs-fasopay (résumé : un membre par ligne) ===
+Commande : mongosh --quiet --host fasopay-noeud1 --eval "rs.status().members.forEach(function (m) { print(m.name + ' : ' + m.stateStr + ', santé ' + m.health + ', optime ' + m.optimeDate.toISOString()) }); print('set : ' + rs.status().set + ', membres votants : ' + rs.status().votingMembersCount + ', majorité d écriture : ' + rs.status().writeMajorityCount)"
+Date : Mon Nov  9 20:51:05 UTC 2026
+fasopay-noeud1:27017 : PRIMARY, santé 1, optime 2026-11-09T20:50:52.000Z
+fasopay-noeud2:27017 : SECONDARY, santé 1, optime 2026-11-09T20:50:52.000Z
+fasopay-noeud3:27017 : SECONDARY, santé 1, optime 2026-11-09T20:50:52.000Z
+set : rs-fasopay, membres votants : 3, majorité d écriture : 2
+
+=== Partie 5 : rs.status() complet ===
+Commande : mongosh --quiet --host fasopay-noeud1 --eval "rs.status()"
+Date : Mon Nov  9 20:51:06 UTC 2026
+{
+  set: 'rs-fasopay',
+  date: ISODate('2026-11-09T20:51:06.626Z'),
+  myState: 1,
+  term: Long('1'),
+  syncSourceHost: '',
+  syncSourceId: -1,
+  heartbeatIntervalMillis: Long('2000'),
+  majorityVoteCount: 2,
+  writeMajorityCount: 2,
+  votingMembersCount: 3,
+  writableVotingMembersCount: 3,
+  optimes: {
+    lastCommittedOpTime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+    lastCommittedWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+    readConcernMajorityOpTime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+    appliedOpTime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+    durableOpTime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+    writtenOpTime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+    lastAppliedWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+    lastDurableWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+    lastWrittenWallTime: ISODate('2026-11-09T20:50:52.962Z')
+  },
+  lastStableRecoveryTimestamp: Timestamp({ t: 1794257442, i: 1 }),
+  electionCandidateMetrics: {
+    lastElectionReason: 'electionTimeout',
+    lastElectionDate: ISODate('2026-11-09T20:50:52.799Z'),
+    electionTerm: Long('1'),
+    lastCommittedOpTimeAtElection: { ts: Timestamp({ t: 1794257442, i: 1 }), t: Long('-1') },
+    lastSeenWrittenOpTimeAtElection: { ts: Timestamp({ t: 1794257442, i: 1 }), t: Long('-1') },
+    lastSeenOpTimeAtElection: { ts: Timestamp({ t: 1794257442, i: 1 }), t: Long('-1') },
+    numVotesNeeded: 2,
+    priorityAtElection: 1,
+    electionTimeoutMillis: Long('10000'),
+    numCatchUpOps: Long('0'),
+    newTermStartDate: ISODate('2026-11-09T20:50:52.860Z'),
+    wMajorityWriteAvailabilityDate: ISODate('2026-11-09T20:50:53.327Z')
+  },
+  members: [
+    {
+      _id: 0,
+      name: 'fasopay-noeud1:27017',
+      health: 1,
+      state: 1,
+      stateStr: 'PRIMARY',
+      uptime: 350,
+      optime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeDate: ISODate('2026-11-09T20:50:52.000Z'),
+      optimeWritten: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeWrittenDate: ISODate('2026-11-09T20:50:52.000Z'),
+      lastAppliedWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastDurableWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastWrittenWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      syncSourceHost: '',
+      syncSourceId: -1,
+      infoMessage: 'Could not find member to sync from',
+      electionTime: Timestamp({ t: 1794257452, i: 1 }),
+      electionDate: ISODate('2026-11-09T20:50:52.000Z'),
+      configVersion: 1,
+      configTerm: 1,
+      self: true,
+      lastHeartbeatMessage: ''
+    },
+    {
+      _id: 1,
+      name: 'fasopay-noeud2:27017',
+      health: 1,
+      state: 2,
+      stateStr: 'SECONDARY',
+      uptime: 24,
+      optime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeDurable: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeWritten: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeDate: ISODate('2026-11-09T20:50:52.000Z'),
+      optimeDurableDate: ISODate('2026-11-09T20:50:52.000Z'),
+      optimeWrittenDate: ISODate('2026-11-09T20:50:52.000Z'),
+      lastAppliedWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastDurableWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastWrittenWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastHeartbeat: ISODate('2026-11-09T20:51:04.825Z'),
+      lastHeartbeatRecv: ISODate('2026-11-09T20:51:05.821Z'),
+      pingMs: Long('0'),
+      lastHeartbeatMessage: '',
+      syncSourceHost: 'fasopay-noeud1:27017',
+      syncSourceId: 0,
+      infoMessage: '',
+      configVersion: 1,
+      configTerm: 1
+    },
+    {
+      _id: 2,
+      name: 'fasopay-noeud3:27017',
+      health: 1,
+      state: 2,
+      stateStr: 'SECONDARY',
+      uptime: 24,
+      optime: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeDurable: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeWritten: { ts: Timestamp({ t: 1794257452, i: 16 }), t: Long('1') },
+      optimeDate: ISODate('2026-11-09T20:50:52.000Z'),
+      optimeDurableDate: ISODate('2026-11-09T20:50:52.000Z'),
+      optimeWrittenDate: ISODate('2026-11-09T20:50:52.000Z'),
+      lastAppliedWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastDurableWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastWrittenWallTime: ISODate('2026-11-09T20:50:52.962Z'),
+      lastHeartbeat: ISODate('2026-11-09T20:51:04.824Z'),
+      lastHeartbeatRecv: ISODate('2026-11-09T20:51:05.821Z'),
+      pingMs: Long('0'),
+      lastHeartbeatMessage: '',
+      syncSourceHost: 'fasopay-noeud1:27017',
+      syncSourceId: 0,
+      infoMessage: '',
+      configVersion: 1,
+      configTerm: 1
+    }
+  ],
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794257452, i: 16 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794257452, i: 16 })
+}

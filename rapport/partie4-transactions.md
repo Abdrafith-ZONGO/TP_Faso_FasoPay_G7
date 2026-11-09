@@ -13,7 +13,7 @@ Tous les tests tournent sur une base dédiée, `fasopay_test`, recréée à chaq
 5. **En cas d'erreur, tout est annulé.** Un refus du contrat renvoie son erreur ; une clé en double (code 11000, un autre client vient de valider la même clé) devient un rejeu ; un conflit passager (`TransientTransactionError`) est rejoué après une courte attente.
 6. **Validation.** Si son résultat est inconnu (`UnknownTransactionCommitResult`), elle est redemandée ; si l'erreur est passagère, toute la transaction est rejouée. Le nombre d'essais est limité.
 
-Deux choix à signaler. Un refus n'est pas mémorisé : rien n'étant écrit, la même clé peut être réessayée plus tard (par exemple après un dépôt). Et sur notre Replica Set à un nœud, `w: "majority"` équivaut à `w: 1` : la garantie de majorité ne prend son sens qu'avec trois nœuds (Partie 5).
+Deux choix à signaler. Un refus n'est pas mémorisé : rien n'étant écrit, la même clé peut être réessayée plus tard (par exemple après un dépôt). Sur notre Replica Set à un nœud, `w: "majority"` équivaut à `w: 1` : nous avons donc rejoué tous les tests sur le Replica Set à trois nœuds de la Partie 5, où une écriture majoritaire attend réellement un deuxième nœud. Les résultats sont identiques : 36 vérifications OK sur 36, et 10 sur 10 pour la concurrence (`preuves/04-transaction-rs3.txt`, `preuves/04-concurrence-rs3.txt`).
 
 ## 4.3 Ce que nos tests démontrent
 Résultat : 36 vérifications OK sur 36 (`preuves/04-transaction.txt`).

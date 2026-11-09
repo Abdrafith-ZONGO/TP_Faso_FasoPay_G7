@@ -1,0 +1,35 @@
+=== Partie 5 : écritures annulées (rollback) sur l'ancien primary, mode w1 ===
+
+=== Partie 5 : nœud courant et fichiers de rollback ===
+Commande : hostname; find /data/db/rollback -type f -exec ls -l {} \;
+Date : Mon Nov  9 21:10:36 UTC 2026
+c413870e9ec2
+-rw------- 1 mongodb mongodb 5030 Nov  9 21:10 /data/db/rollback/441d9fa9-0ec8-4ff6-b071-ddd54aaed8b4/removed.2026-11-09T21-10-18.0.bson
+
+=== Partie 5 : les 3 premiers documents annulés (bsondump) ===
+Commande : find /data/db/rollback -type f -name '*.bson' -exec bsondump --quiet {} \; | head -3
+Date : Mon Nov  9 21:10:36 UTC 2026
+{"_id":"w1-164","n":{"$numberInt":"164"},"mode":"w1","t":{"$date":{"$numberLong":"1794258591689"}}}
+{"_id":"w1-163","n":{"$numberInt":"163"},"mode":"w1","t":{"$date":{"$numberLong":"1794258591586"}}}
+{"_id":"w1-157","n":{"$numberInt":"157"},"mode":"w1","t":{"$date":{"$numberLong":"1794258590971"}}}
+
+=== Partie 5 : comparaison avec le journal de la boucle et messages du serveur ===
+Commande : mongosh "mongodb://fasopay-noeud1:27017,fasopay-noeud2:27017,fasopay-noeud3:27017/?replicaSet=rs-fasopay&serverSelectionTimeoutMS=2000" --quiet --eval "load('/tmp/code/05-boucle.js'); analyserRollback('w1')"
+Date : Mon Nov  9 21:10:36 UTC 2026
+écritures acquittées (w: 1) dans le journal : 182
+écritures acquittées absentes de la base après le retour du nœud : 97 (w1-86 à w1-182)
+documents trouvés dans les fichiers de rollback : 97
+écritures perdues retrouvées dans les fichiers de rollback : 97 sur 97
+messages du serveur contenant « rollback » (les 12 derniers) :
+  2026-11-09T21:10:19.070+00:00 | Shutting down oplog cap maintainer thread | {"reason":{"code":11602,"codeName":"InterruptedDueToReplStateChange","errmsg":"Rollback in progress."}}
+  2026-11-09T21:10:19.074+00:00 | Rolling back to the stable timestamp | {"stableTimestamp":{"$timestamp":{"t":1794258583,"i":6}},"initialDataTimestamp":{"$timestamp":{"t":1794257442,"i":1}}}
+  2026-11-09T21:10:19.169+00:00 | Rolling back to the stable timestamp completed by storage engine | {"attempts":0}
+  2026-11-09T21:10:19.186+00:00 | Operations reverted by rollback | {"insert":97,"update":0,"delete":0,"insertGlobalIndexKey":0,"deleteGlobalIndexKey":0}
+  2026-11-09T21:10:19.201+00:00 | Marking to truncate all oplog entries with timestamps greater than common point | {"commonPoint":{"$timestamp":{"t":1794258583,"i":6}}}
+  2026-11-09T21:10:19.204+00:00 | Not updating committed snapshot because we are in rollback | {}
+  2026-11-09T21:10:19.204+00:00 | Triggering the rollback op observer | {}
+  2026-11-09T21:10:19.205+00:00 | Rollback complete | {}
+  2026-11-09T21:10:19.205+00:00 | Rollback summary | {"startTime":{"$date":"2026-11-09T21:10:18.951Z"},"endTime":{"$date":"2026-11-09T21:10:19.205Z"},"syncSource":"fasopay-noeud3:27017","rollbackDataFileDirectory"
+  2026-11-09T21:10:19.205+00:00 | Transition to SECONDARY | {}
+  2026-11-09T21:10:19.205+00:00 | Replica set state transition | {"newState":"SECONDARY","oldState":"ROLLBACK"}
+  2026-11-09T21:10:19.205+00:00 | Rollback successful | {}
