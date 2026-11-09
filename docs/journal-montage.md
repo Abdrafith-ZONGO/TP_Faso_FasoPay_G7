@@ -655,3 +655,52 @@ Résultat : taille moyenne 253,02 octets (transactions), 130,19 (ledger), 144 (w
 La dernière commande de cette session (`Object.bsonsize`) a échoué : cette fonction n'existe pas dans mongosh 2.14.0. La mesure de la taille d'un document `outbox` a été refaite dans une seconde session, avec `$bsonSize` dans un pipeline (deuxième bloc de la preuve).
 
 Remarque : dans la sortie brute conservée, certains mots s'affichent déformés dans l'écho des commandes (par exemple `$bso$bsonSize`, `$gro$group`). C'est un défaut d'affichage du terminal : les requêtes tapées étaient correctes et les résultats portent les bons noms de champs.
+## 17. Base de test et tests des transactions (Partie 4)
+
+Objectif : tester `code/transfer.js` sans jamais modifier `fasopay_tp`. Les tests tournent dans une base dédiée, `fasopay_test`, recréée à chaque lancement avec nos validateurs, l'index unique sur `transactions.idempotencyKey` et 9 wallets de test (`code/04-base-test.js`). Les tests sont lancés par le script `code/04-lancer.sh`, exécuté dans le conteneur : il écrit lui-même chaque preuve (commande, date `date -u`, sortie brute) et lance les deux clients du test de concurrence comme deux processus `mongosh` en parallèle.
+
+Création des dossiers de travail dans le conteneur, puis copie du dossier `code` (à refaire après chaque modification du code) :
+
+```powershell
+docker exec mongo-rs1 mkdir -p /tmp/code /tmp/preuves
+docker cp code/. mongo-rs1:/tmp/code/
+```
+
+Rôle de chaque morceau :
+
+| Morceau | Rôle |
+|---|---|
+| `mkdir -p /tmp/code /tmp/preuves` | crée, dans le conteneur, le dossier du code et celui où s'écrivent les preuves |
+| `docker cp code/. mongo-rs1:/tmp/code/` | copie le contenu du dossier `code` dans `/tmp/code` du conteneur, où `load("/tmp/code/transfer.js")` le trouve |
+
+Lancement des trois séries de tests, puis récupération de chaque preuve dans `preuves/` :
+
+```powershell
+docker exec mongo-rs1 sh /tmp/code/04-lancer.sh tests
+docker cp mongo-rs1:/tmp/preuves/04-transaction.txt preuves/04-transaction.txt
+docker exec mongo-rs1 sh /tmp/code/04-lancer.sh concurrence
+docker cp mongo-rs1:/tmp/preuves/04-concurrence.txt preuves/04-concurrence.txt
+docker exec mongo-rs1 sh /tmp/code/04-lancer.sh lostupdate
+docker cp mongo-rs1:/tmp/preuves/04-lost-update.txt preuves/04-lost-update.txt
+```
+
+Résultat :
+- `tests` (`04-base-test.js` puis `04-tests.js`) : 36 vérifications OK, 0 en échec (chargement sans effet, virement réussi, 1 appel et 3 rejeux, 10 refus, abort prouvé, réponse perdue, documents valides, argent conservé). Preuve : `preuves/04-transaction.txt` (date `Mon Nov  9 19:49:21 UTC 2026`).
+- `concurrence` (`04-concurrence.js`) : 10 vérifications OK, 0 en échec : 30 virements acceptés sur 50 (19 pour le client A, 11 pour le client B), solde final 0, monnaie conservée, 60 lignes de ledger, 30 outbox, 6 conflits rejoués ; la même clé envoyée par les deux clients ne produit qu'un virement. Preuve : `preuves/04-concurrence.txt` (date `Mon Nov  9 19:51:44 UTC 2026`).
+- `lostupdate` (`04-lost-update.js`) : la version naïve sans transaction accepte 50 débits de 100 FCFA (5000 promis) alors que seuls 2500 FCFA sont retirés du wallet. Preuve : `preuves/04-lost-update.txt` (date `Mon Nov  9 19:53:08 UTC 2026`).
+
+La base `fasopay_tp` n'est pas touchée par ces tests ; `fasopay_test` reste en place et peut être recréée à tout moment par `04-base-test.js`.
+
+### 17.1 Mesure du débit de `transfer()`
+
+Objectif : mesurer combien de virements par seconde `transfer()` réalise sur notre machine. La mesure se fait dans une troisième base, `fasopay_bench`, qui reçoit une copie des 2 000 wallets de `fasopay_tp` (lue seulement, jamais modifiée) et les mêmes index que la Partie 3 (`code/04-debit.js`). Chaque virement fait 100 FCFA entre deux wallets `ACTIVE` tirés au hasard.
+
+Copie du code mis à jour, mesure, puis récupération de la preuve :
+
+```powershell
+docker cp code/. mongo-rs1:/tmp/code/
+docker exec mongo-rs1 sh /tmp/code/04-lancer.sh debit
+docker cp mongo-rs1:/tmp/preuves/04-debit.txt preuves/04-debit.txt
+```
+
+Résultat : avec 1 client, 1 000 virements en 7,98 s, soit 125,3 virements/s (752 écritures de documents/s), p95 à 10 ms. Avec 4 clients en parallèle, 999 virements acceptés sur 1 000 en 3,03 s, soit 329,7 virements/s (1 978 écritures/s), p95 à 17 ms et p99 à 35 ms, 6 conflits rejoués. La somme des soldes reste égale à 832251836 FCFA. Preuve : `preuves/04-debit.txt` (date `Mon Nov  9 19:59:57 UTC 2026`).

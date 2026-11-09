@@ -1,0 +1,23 @@
+
+=== Partie 4 : préparation de la démonstration du lost update ===
+Commande : mongosh fasopay_test --quiet --eval "load('/tmp/code/04-lost-update.js'); preparer()"
+Date : Mon Nov  9 19:53:08 UTC 2026
+préparé : W_LU = 3000 ; départ commun à 2026-11-09T19:53:15.357Z
+
+=== Partie 4 : deux clients NAÏFS lancés en même temps (lire, vérifier, réécrire, sans transaction) ===
+Commande : mongosh fasopay_test --quiet --eval "load('/tmp/code/04-lost-update.js'); clientNaif('A')" > /tmp/preuves/naif-A.log 2>&1 & mongosh fasopay_test --quiet --eval "load('/tmp/code/04-lost-update.js'); clientNaif('B')" > /tmp/preuves/naif-B.log 2>&1 & wait
+Date : Mon Nov  9 19:53:09 UTC 2026
+--- sortie du client naïf A ---
+client naïf A : débits acceptés=25, refusés=0
+--- sortie du client naïf B ---
+client naïf B : débits acceptés=25, refusés=0
+
+=== Partie 4 : résultat de la version naïve ===
+Commande : mongosh fasopay_test --quiet --eval "load('/tmp/code/04-lost-update.js'); verifier()"
+Date : Mon Nov  9 19:53:15 UTC 2026
+client A : {"_id":"naif-A","acceptes":25,"refuses":0}
+client B : {"_id":"naif-B","acceptes":25,"refuses":0}
+débits acceptés par les clients : 50, soit 5000 FCFA promis
+argent réellement retiré de W_LU : 3000 - 500 = 2500 FCFA
+écart : 2500 FCFA de paiements acceptés sans débit correspondant (lost update)
+Des débits ont été perdus : la version naïve ne protège pas l'argent.

@@ -1,0 +1,46 @@
+
+=== Partie 4 : préparation de fasopay_bench (copie des 2 000 wallets de fasopay_tp, mêmes index) ===
+Commande : mongosh fasopay_bench --quiet --eval "load('/tmp/code/04-debit.js'); preparer()"
+Date : Mon Nov  9 19:59:57 UTC 2026
+wallets copiés : 2000 (dont 1948 ACTIVE), somme des soldes : 832251836 FCFA
+départ commun à 2026-11-09T20:00:03.716Z
+
+=== Partie 4 : débit avec 1 client (1 000 virements à la suite) ===
+Commande : mongosh fasopay_bench --quiet --eval "load('/tmp/code/04-debit.js'); client('S1', 1000); resultat('1 client')"
+Date : Mon Nov  9 19:59:57 UTC 2026
+client S1 : {"_id":"res-S1","nb":1000,"acceptes":1000,"refuses":0,"conflits":0,"debut":"2026-11-09T20:00:03.720Z","fin":"2026-11-09T20:00:11.704Z","duree_s":7.984,"p50_ms":8,"p95_ms":10,"p99_ms":12,"max_ms":33}
+
+SÉRIE « 1 client » : 1 client(s), 1000 virements demandés, 1000 acceptés, 0 rejoués après un conflit
+durée totale : 7.98 s
+débit : 125.3 virements/s, soit 752 écritures de documents/s (6 par virement)
+temps de réponse d'un virement : p95 le plus élevé des clients = 10 ms, p99 le plus élevé = 12 ms
+contrôles cumulés : somme des soldes = 832251836 FCFA (832251836 au départ) ; transactions = 1000, ledger = 2000 (2 × 1000), outbox = 1000
+OK     argent conservé, ledger = 2 × virements, outbox = virements
+
+=== Partie 4 : nouveau départ commun ===
+Commande : mongosh fasopay_bench --quiet --eval "load('/tmp/code/04-debit.js'); nouveauDepart()"
+Date : Mon Nov  9 20:00:11 UTC 2026
+départ commun à 2026-11-09T20:00:18.113Z
+
+=== Partie 4 : débit avec 4 clients en parallèle (4 × 250 virements) ===
+Commande : for c in P1 P2 P3 P4; do mongosh fasopay_bench --quiet --eval "load('/tmp/code/04-debit.js'); client('$c', 250)" > /tmp/preuves/bench-$c.log 2>&1 & done; wait
+Date : Mon Nov  9 20:00:12 UTC 2026
+--- client P1 ---
+client P1 : {"_id":"res-P1","nb":250,"acceptes":250,"refuses":0,"conflits":0,"debut":"2026-11-09T20:00:18.113Z","fin":"2026-11-09T20:00:20.991Z","duree_s":2.878,"p50_ms":11,"p95_ms":14,"p99_ms":28,"max_ms":156}
+--- client P2 ---
+client P2 : {"_id":"res-P2","nb":250,"acceptes":250,"refuses":0,"conflits":0,"debut":"2026-11-09T20:00:18.115Z","fin":"2026-11-09T20:00:21.010Z","duree_s":2.895,"p50_ms":11,"p95_ms":15,"p99_ms":27,"max_ms":155}
+--- client P3 ---
+client P3 : {"_id":"res-P3","nb":250,"acceptes":250,"refuses":0,"conflits":5,"debut":"2026-11-09T20:00:18.115Z","fin":"2026-11-09T20:00:21.143Z","duree_s":3.028,"p50_ms":11,"p95_ms":17,"p99_ms":35,"max_ms":159}
+--- client P4 ---
+client P4 : {"_id":"res-P4","nb":250,"acceptes":249,"refuses":1,"conflits":1,"debut":"2026-11-09T20:00:18.116Z","fin":"2026-11-09T20:00:21.035Z","duree_s":2.919,"p50_ms":11,"p95_ms":15,"p99_ms":32,"max_ms":154}
+
+=== Partie 4 : résultat de la série à 4 clients ===
+Commande : mongosh fasopay_bench --quiet --eval "load('/tmp/code/04-debit.js'); resultat('4 clients')"
+Date : Mon Nov  9 20:00:21 UTC 2026
+
+SÉRIE « 4 clients » : 4 client(s), 1000 virements demandés, 999 acceptés, 6 rejoués après un conflit
+durée totale : 3.03 s
+débit : 329.7 virements/s, soit 1978 écritures de documents/s (6 par virement)
+temps de réponse d'un virement : p95 le plus élevé des clients = 17 ms, p99 le plus élevé = 35 ms
+contrôles cumulés : somme des soldes = 832251836 FCFA (832251836 au départ) ; transactions = 1999, ledger = 3998 (2 × 1999), outbox = 1999
+OK     argent conservé, ledger = 2 × virements, outbox = virements

@@ -45,12 +45,17 @@ Mesuré : 12 529 664 octets d'index pour 463 878 entrées (3 index × 60 000 tra
 
 Le nœud de 64 Go tient tant que les index restent sous **49 octets par entrée** : au-delà, le working set dépasse le cache de 31,5 Go. Nous gardons donc 64 Go comme base, avec un seuil de surveillance : si les index dépassent 45 octets par entrée en production, ou si le working set dépasse 60 % de la RAM, nous passons à des nœuds de 128 Go. C'est une montée en gamme, pas un sharding.
 
+## 2 ter. Un deuxième chiffre qui contredit : le débit mesuré
+Nous avons mesuré `transfer()` sur notre machine (Partie 4, `preuves/04-debit.txt`) : **125 virements/s** avec un client, **330 virements/s** avec 4 clients en parallèle (1 978 écritures de documents/s), p95 à 17 ms. La cible est de 1 200 virements/s au pic, et la règle que nous retenons demande que les écritures restent sous **50 % de la capacité du primary** : il faudrait donc un primary capable d'environ **2 400 virements/s**, soit plus de 7 fois ce que nous mesurons.
+
+Ce chiffre ne condamne pas l'architecture, mais il ne la prouve pas non plus : la mesure a été faite sur un ordinateur portable, avec les clients sur la même machine que le serveur et un seul nœud. **Décision :** avant la mise en production, un test de charge sur le matériel cible est obligatoire. Si le primary n'y atteint pas 2 400 virements/s, nous montons d'abord en gamme (CPU, disques plus rapides) ; si cela ne suffit pas, nous répartissons les écritures (sharding, Partie 6).
+
 ## 3. Verdict (une phrase chacun, avec un SEUIL chiffré)
 Nous décidons chaque composant sur trois critères : le volume par Replica Set, la part de la RAM prise par le working set, et la part du débit du primary prise par les écritures. Pour Kafka, ce n'est pas le débit qui compte, mais le nombre de consommateurs indépendants et le besoin de rejeu.
 
 | Question | Réponse | Seuil de bascule (chiffré, avec votre ordre de grandeur) |
 |---|---|---|
-| Un seul replica set suffit-il ? | Oui à 18 mois : 0,31 To par an non compressé (sous la zone de 1 à 2 To) ; working set de 25,9 Go sur 64 Go, soit 40 % de la RAM (54 % dans l'hypothèse prudente de la section 2 bis) ; les 7 200 écritures par seconde au pic restent à comparer au débit d'un primary, que nous mesurerons en Partie 4. | Working set au-delà de 60 % de la RAM ; ou plus de 1 à 2 To par replica set ; ou écritures au-delà de 50 % du débit mesuré en Partie 4. |
+| Un seul replica set suffit-il ? | Oui à 18 mois : 0,31 To par an non compressé (sous la zone de 1 à 2 To) ; working set de 25,9 Go sur 64 Go, soit 40 % de la RAM (54 % dans l'hypothèse prudente de la section 2 bis) ; pour les 7 200 écritures par seconde au pic, nous avons mesuré 330 virements/s sur un portable (section 2 ter) : le critère n'est pas encore vérifié sur le matériel cible. | Working set au-delà de 60 % de la RAM ; ou plus de 1 à 2 To par replica set ; ou écritures au-delà de 50 % du débit du primary, mesuré par un test de charge sur le matériel cible (il faut au moins 2 400 virements/s). |
 | Sharding ? | Non : aucun des trois critères n'est franchi à 18 mois. Nous ne le déclencherons que sur cette feuille et un test de charge. | Sur des nœuds de 64 Go : entre 490 M tx/an (working set à 50 % de la RAM) et 600 M tx/an (60 %). En volume : 1 To non compressé atteint en 3,2 ans, 2 To en 6,5 ans. |
 | Kafka ? | Non au démarrage : un seul consommateur des événements `outbox` (le relais de notifications), qu'un Change Stream avec jeton de reprise suffit à servir. | Dès qu'un **deuxième consommateur indépendant** doit relire les événements au-delà de la fenêtre de l'oplog (par exemple la détection de fraude ou la comptabilité), ou qu'il faut un tampon devant le pic. Probable à la cible : nous le tranchons en Partie 7. |
 | Spark / Data Lake ? | Non : 224,4 Go de données par an, soit environ 615 Mo par jour ; un `$merge` quotidien vers un read model suffit. E3 prend 23 ms sur le POC (`03-explain.txt`). | Plusieurs To à transformer par cycle, ou des sources hétérogènes hors MongoDB (opérateurs télécom, banques partenaires). |
@@ -71,4 +76,4 @@ Nous décidons chaque composant sur trois critères : le volume par Replica Set,
 8. Les documents `outbox` sont supprimés après envoi : ils n'entrent pas dans le volume annuel (un document pèse 109 octets, mesuré).
 9. Volume constant de 400 M tx/an ; archivage des données de plus de 2 ans.
 10. Taille des index par entrée : 27 octets mesurés, 40 à 60 en hypothèse prudente (section 2 bis).
-11. Débit d'écriture d'un nœud : pas encore mesuré ; il le sera avec `transfer.js` en Partie 4.
+11. Débit d'écriture d'un nœud : mesuré sur un ordinateur portable seulement (125 virements/s avec 1 client, 330 avec 4) ; la capacité d'un serveur de production n'est pas testée (section 2 ter).
