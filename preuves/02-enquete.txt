@@ -1,0 +1,92 @@
+=== E1 : wallets dont balance ≠ somme signée du ledger ===
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Sun Nov  8 23:27:03 UTC 2026
+
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af105504e101330597c607e
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> var e1 = [{ $match: { walletId: { $ne: null } } }, { $group: { _id: "$walletId", soldeLedger: { $sum: { $co$cond: [{ $eq: ["$direction", "CREDIT"] }, "$amount", { $multiply: ["$amount", -1] }] } }, lignes: { $sum: 1 } } }, { $lookup: { from: "wallets", localField: "_id", foreignField: "_id", as: "w" } }, { $unwind: "$w" }, { $project: { _id: 1, balance: "$w.balance", soldeLedger: 1, liglignes: 1, ecart: { $subtract: ["$w.balance", "$soldeLedger"] } } }, { $match: { ecart: { $ne: 0 } } }, { $sort: { ecart: 1 } }]
+
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate(e1)
+[
+  {
+    _id: 'W001124',
+    soldeLedger: 278025,
+    lignes: 7,
+    balance: 249025,
+    ecart: -29000
+  },
+  {
+    _id: 'W001372',
+    soldeLedger: 585152,
+    lignes: 33,
+    balance: 557152,
+    ecart: -28000
+  },
+  {
+    _id: 'W000967',
+    soldeLedger: 415447,
+    lignes: 28,
+    balance: 389447,
+    ecart: -26000
+  },
+  {
+    _id: 'W001796',
+    soldeLedger: 960793,
+    lignes: 49,
+    balance: 949293,
+    ecart: -11500
+  },
+  {
+    _id: 'W000668',
+    soldeLedger: 487654,
+    lignes: 31,
+    balance: 478654,
+    ecart: -9000
+  },
+  {
+    _id: 'W000769',
+    soldeLedger: 41192,
+    lignes: 86,
+    balance: 75692,
+    ecart: 34500
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate(e1.concat([{ $group: { _id: null, wallets: { $sum: 1 }, ecartNet: { $sum: "$ecart" }, ecartAbsolu: { $sum: { $abs: "$ecart" } } } }]))
+[ { _id: null, wallets: 6, ecartNet: -69000, ecartAbsolu: 138000 } ]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { walletId: { $ne: null } } }, { $group: { _id: "$walletId" } }, { $$count: "walletsAvecLedger" }])
+[ { walletsAvecLedger: 2000 } ]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { walletId: { $ne: null } } }, { $group: { _id: null, totalLedgerSigtotalLedgerSigne: { $sum: { $cond: [{ $eq: ["$direction", "CREDIT"] }, "$amount", { $multiply: ["$amount", -1] }] } } } }])
+[ { _id: null, totalLedgerSigne: 832320836 } ]
+rs0 [direct: primary] fasopay_tp> db.wallets.aggregate([{ $group: { _id: null, totalBalances: { $sum: "$balance" } } }])
+[ { _id: null, totalBalances: 832251836 } ]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { walletId: { $ne: null } } }, { $sort: { createdAt: 1, _id: 1 } },{ $group: { _id: "$walletId", derniereBalanceAfter: { $last: "$balanceAfter" } } }, { $lookup: { from: "wallets", localField: "_id", foreignField: "_id", as: "w" } }, { $unwind: "$w" }, { $match: { $expr: { $ne: ["$w.balance", "$derniereBalanceAfter"] } } }, { $project: { _id: 1, bbalance: "$w.balance", derniereBalanceAfter: 1 } }, { $sort: { _id: 1 } }])
+[
+  { _id: 'W000668', derniereBalanceAfter: 487654, balance: 478654 },
+  { _id: 'W000769', derniereBalanceAfter: 41192, balance: 75692 },
+  { _id: 'W000967', derniereBalanceAfter: 415447, balance: 389447 },
+  { _id: 'W001124', derniereBalanceAfter: 278025, balance: 249025 },
+  { _id: 'W001372', derniereBalanceAfter: 585152, balance: 557152 },
+  { _id: 'W001796', derniereBalanceAfter: 960793, balance: 949293 }
+]
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 

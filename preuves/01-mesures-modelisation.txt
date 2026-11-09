@@ -1,0 +1,59 @@
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Sun Nov  8 23:01:03 UTC 2026
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af0ff38dcf4a151ad2b1c0b
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> db.wallets.aggregate([{ $group: { _id: "$customerId", n: { $sum: 1 } } }, { $group: { _id: "$n", clients: { $sum: 1 } } }])
+[ { _id: 1, clients: 2000 } ]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $group: { _id: "$txId", n: { $sum: 1 } } }, { $group: { _id: "$n", transactions: { $sum: 1 } } }, { $sort: { _id: 1 } }])
+[
+  { _id: 2, transactions: 28111 },
+  { _id: 3, transactions: 28093 },
+  { _id: 4, transactions: 121 },
+  { _id: 6, transactions: 159 }
+]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $group: { _id: "$txId" } }, { $count: "transactionsAvecLedger" }])
+[ { transactionsAvecLedger: 56484 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.countDocuments({ status: { $in: ["FAILED", "PENDING"] } })
+3516
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $group: { _id: "$txId", net: { $sum: { $cond: [{ $eq: ["$direction", "CREDIT"] }, "$amount", { $multiply: ["$amount", -1] }] } } } }, { $group: { _id: null, transactions: { $sum: 1 }, desequilibrees: { $sum: { $co$cond: [{ $ne: ["$net", 0] }, 1, 0] } } } }])
+[ { _id: null, transactions: 56484, desequilibrees: 0 } ]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $group: { _id: "$direction", total: { $sum: "$amount" } } }])
+[
+  { _id: 'DEBIT', total: 1955479314 },
+  { _id: 'CREDIT', total: 1955479314 }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { fromWalletId: { $exists: true } } }, { $group: { _id: "$fromWalletId", n: { $sum: 1 } } }, { $group: { _id: null, wallets: { $sum: 1 }, moyenne: { $avg: "$n" }, maximum: { $max: "$n" } } }])
+[
+  { _id: null, wallets: 1939, moyenne: 23.978855079938114, maximum: 319 }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{ $match: { merchantId: { $exists: true } } }, { $group: { _id: "$merchantId", n: { $sum: 1 } } }, { $group: { _id: null, marchands: { $sum: 1 }, total: { $sum: "$n" }, moyenne: { $avg: "$n" }, maximum: { $max: "$n" } } }])
+[
+  {
+    _id: null,
+    marchands: 150,
+    total: 17989,
+    moyenne: 119.92666666666666,
+    maximum: 4479
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.transactions.countDocuments({ attempts: { $exists: true } })
+21
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { walletId: { $ne: null } } }, { $group: { _id: null,octetsMoyens: { $avg: { $bsonSize: "$$ROOT" } } } }])
+[ { _id: null, octetsMoyens: 134.39663351185922 } ]
+rs0 [direct: primary] fasopay_tp> 

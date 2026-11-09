@@ -1,0 +1,69 @@
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Sun Nov  8 21:46:44 UTC 2026
+Current Mongosh Log ID:        6af0edcca59e2fea1994b8be
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{$group: {_id: {amount: {$type: "$amount"}, createdAt: {$type: "$createdAt"}}, n: {$sum: 1}}}])
+[ { _id: { amount: 'int', createdAt: 'date' }, n: 60000 } ]
+rs0 [direct: primary] fasopay_tp> db.transactions.aggregate([{$group: {_id: {fee: {$type: "$fee"}, completedAt: {$type: "$completedAt"}}, n: {$sum: 1}}}])
+[
+  { _id: { fee: 'int', completedAt: 'missing' }, n: 3516 },
+  { _id: { fee: 'int', completedAt: 'date' }, n: 56484 }
+]
+rs0 [direct: primary] fasopay_tp> db.wallets.aggregate([{$group: {_id: {balance: {$type: "$balance"}, dailyLimit: {$type: "$dailyLimit"}, version: {$type: "$version"}, updatedAt: {$type: "$updatedAt"}}, n: {$sum: 1}}}])
+[
+  {
+    _id: {
+      balance: 'int',
+      dailyLimit: 'int',
+      version: 'int',
+      updatedAt: 'date'
+    },
+    n: 2000
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{$group: {_id: {amount: {$type: "$amount"}, balanceAfter: {$type: "$balanceAfter"}, walletId: {$type: "$walletId"}, createdAt: {$type: "$createdAt"}}, n: {$sum: 1}}}])
+[
+  {
+    _id: {
+      amount: 'int',
+      balanceAfter: 'int',
+      walletId: 'string',
+      createdAt: 'date'
+    },
+    n: 71885
+  },
+  {
+    _id: {
+      amount: 'int',
+      balanceAfter: 'missing',
+      walletId: 'null',
+      createdAt: 'date'
+    },
+    n: 70054
+  }
+]
+rs0 [direct: primary] fasopay_tp> db.customers.aggregate([{$group: {_id: {kycLevel: {$type: "$kycLevel"}, createdAt: {$type: "$createdAt"}}, n: {$sum: 1}}}])
+[ { _id: { kycLevel: 'int', createdAt: 'date' }, n: 2000 } ]
+rs0 [direct: primary] fasopay_tp> db.merchants.aggregate([{$group: {_id: {mcc: {$type: "$mcc"}, feePct: {$type: "$feePct"}, location: {$typ$type: "$location"}, createdAt: {$type: "$createdAt"}}, n: {$sum: 1}}}])
+[
+  {
+    _id: { mcc: 'int', feePct: 'double', location: 'object', createdAt: 'date' },
+    n: 150
+  }
+]
+rs0 [direct: primary] fasopay_tp>

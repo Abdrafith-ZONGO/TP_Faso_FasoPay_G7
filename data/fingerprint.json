@@ -1,0 +1,50 @@
+{
+  "groupe": "07",
+  "params": {
+    "customers": 2000,
+    "merchants": 150,
+    "transactions": 60000,
+    "start": "2026-01-01",
+    "days": 181
+  },
+  "counts": {
+    "customers": 2000,
+    "wallets": 2000,
+    "merchants": 150,
+    "transactions": 60000,
+    "ledger_entries": 141939
+  },
+  "sums": {
+    "transactionsAmountAll": 2018172375,
+    "transactionsAmountCompleted": 1946303325,
+    "walletsBalanceTotal": 832251836
+  },
+  "files": {
+    "customers.ndjson": {
+      "sha256": "1bd39553378f7095db29ed2f3a37b039e9d2008a4766f9c658115275b6e06b3f",
+      "bytes": 346207,
+      "lines": 2000
+    },
+    "wallets.ndjson": {
+      "sha256": "9a7db7ee92a5f95577fe9fad3bfbd8010bd72c94a2f4ba1f3efdfd6a78467d43",
+      "bytes": 349574,
+      "lines": 2000
+    },
+    "merchants.ndjson": {
+      "sha256": "4079632f6d721f8d2555a78c32cf9e00d647dbf962853c32b7fd71fdb467a5ef",
+      "bytes": 34094,
+      "lines": 150
+    },
+    "transactions.ndjson": {
+      "sha256": "494012cecd387263210d698bee264a9fe43d0bcd28088b8aecf2ade34c1a4f1d",
+      "bytes": 18083557,
+      "lines": 60000
+    },
+    "ledger_entries.ndjson": {
+      "sha256": "c1f3a8dd43a029cb894932428a2b35ec5fd4e5b75170a98e01660cf5fcf4d35b",
+      "bytes": 22763517,
+      "lines": 141939
+    }
+  },
+  "datasetSha256": "9b0b9a4096422c8590ee97f63843fd991d905e2d18b8cca59ac7276bce94e723"
+}

@@ -1,0 +1,7 @@
+docker exec mongo-rs1 mongosh fasopay_tp --quiet --eval "db.getCollectionNames().forEach(function(c){ print(c + ' : ' + db[c].countDocuments()) })"
+Sat Nov  7 19:54:23 UTC 2026
+transactions : 60000
+customers : 2000
+ledger_entries : 141939
+merchants : 150
+wallets : 2000

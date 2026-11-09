@@ -1,0 +1,29 @@
+Commande : docker exec mongo-rs1 mongosh fasopay_tp --quiet --eval "db.getCollectionNames().forEach(function(c){ print(c + ' : ' + db[c].countDocuments()) })"
+Date : Sun Nov  8 13:36:28 UTC 2026
+transactions : 60000
+customers : 2000
+ledger_entries : 141939
+merchants : 150
+wallets : 2000
+fraud_alerts : 0
+outbox : 0
+
+Commande : docker exec mongo-rs1 mongosh fasopay_tp --quiet --eval "db.transactions.aggregate([{`$group:{_id:null, total:{`$sum:'`$amount'}}}]).toArray()"
+Date : Sun Nov  8 13:38:46 UTC 2026
+[ { _id: null, total: 2018172375 } ]
+
+Commande : docker exec mongo-rs1 mongosh fasopay_tp --quiet --eval "db.transactions.aggregate([{`$match:{status:'COMPLETED'}},{`$group:{_id:null, total:{`$sum:'`$amount'}}}]).toArray()"
+Date : Sun Nov  8 13:39:28 UTC 2026
+[ { _id: null, total: 1946303325 } ]
+
+Commande : docker exec mongo-rs1 mongosh fasopay_tp --quiet --eval "db.wallets.aggregate([{`$group:{_id:null, total:{`$sum:'`$balance'}}}]).toArray()"
+Date : Sun Nov  8 13:39:53 UTC 2026
+[ { _id: null, total: 832251836 } ]
+
+Commande : Get-ChildItem data\*.ndjson | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }
+Date : Sun Nov  8 13:40:29 UTC 2026
+1bd39553378f7095db29ed2f3a37b039e9d2008a4766f9c658115275b6e06b3f  customers.ndjson
+c1f3a8dd43a029cb894932428a2b35ec5fd4e5b75170a98e01660cf5fcf4d35b  ledger_entries.ndjson
+4079632f6d721f8d2555a78c32cf9e00d647dbf962853c32b7fd71fdb467a5ef  merchants.ndjson
+494012cecd387263210d698bee264a9fe43d0bcd28088b8aecf2ade34c1a4f1d  transactions.ndjson
+9a7db7ee92a5f95577fe9fad3bfbd8010bd72c94a2f4ba1f3efdfd6a78467d43  wallets.ndjson

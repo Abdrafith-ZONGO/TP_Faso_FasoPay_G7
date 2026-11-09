@@ -1,0 +1,380 @@
+Commande : docker exec -it mongo-rs1 mongosh fasopay_tp
+Date : Sun Nov  8 22:23:56 UTC 2026
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec mongo-rs1 date -u
+Sun Nov  8 22:23:56 UTC 2026
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> docker exec -it mongo-rs1 mongosh fasopay_tp
+Current Mongosh Log ID: 6af0f6830776aa7ba562dded
+Connecting to:          mongodb://127.0.0.1:27017/fasopay_tp?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.14.0
+Using MongoDB:          8.0.34
+Using Mongosh:          2.14.0
+
+For mongosh info see: https://www.mongodb.com/docs/mongodb-shell/
+
+------
+   The server generated these startup warnings when booting
+   2026-11-07T19:21:22.401+00:00: Using the XFS filesystem is strongly recommended with the WiredTiger storage engine. See http://dochub.mongodb.org/core/prodnotes-filesystem
+   2026-11-07T19:21:22.657+00:00: Access control is not enabled for the database. Read and write access to data and configuration is unrestricted
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: For customers running the current memory allocator, we suggest changing the contents of the following sysfsFile
+   2026-11-07T19:21:22.657+00:00: We suggest setting the contents of sysfsFile to 0.
+   2026-11-07T19:21:22.657+00:00: We suggest setting swappiness to 0 or 1, as swapping can cause performance problems.
+------
+
+rs0 [direct: primary] fasopay_tp> var idTexte = { bsonType: ["string", "objectId"] }, dateBson = { bsonType: "date" }, montant = {bsonType: ["int", "long"], minimum: 0 }, montantPositif = { bsonType: ["int", "long"], minimum: 1 }
+
+rs0 [direct: primary] fasopay_tp> db.runCommand({ collMod: "customers", validationLevel: "strict", validationAction: "error", validator: {$jsonSchema: { bsonType: "object", required: ["_id", "phone", "name", "city", "kycLevel", "segment", "createdAt"], additionalProperties: fafalse, properties: { _id: idTexte, phone: { bsonType: "string", pattern: "^\\+226[0-9]{8}$" }, name: { bsonType: "string", minLength: 1 },city: { bsonType: "string" }, kycLevel: { bsonType: "int", minimum: 0, maximum: 3 }, segment: { bsonType: "string", enum: ["GRAND_PUBLIC","ETUDIANT", "COMMERCANT", "FONCTIONNAIRE"] }, createdAt: dateBson } } } })
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794176671, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794176671, i: 1 })
+}
+rs0 [direct: primary] fasopay_tp> db.runCommand({ collMod: "wallets", validationLevel: "strict", validationAction: "error", validator: { $j$jsonSchema: { bsonType: "object", required: ["_id", "customerId", "balance", "currency", "status", "dailyLimit", "version", "updatedAt"],additionalProperties: false, properties: { _id: idTexte, customerId: { bsonType: "string" }, balance: montant, currency: { bsonType: "string", enum: ["XOF"] }, status: { bsonType: "string", enum: ["ACTIVE", "FROZEN"] }, dailyLimit: montantPositif, version: { bsonType: "int", minimum: 0 }, updatedAt: dateBson } } } })
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794176683, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794176683, i: 1 })
+}
+rs0 [direct: primary] fasopay_tp> db.runCommand({ collMod: "merchants", validationLevel: "strict", validationAction: "error", validator: {$jsonSchema: { bsonType: "object", required: ["_id", "name", "category", "mcc", "city", "location", "feePct", "createdAt"], additionalProperties: false, properties: { _id: idTexte, name: { bsonType: "string", minLength: 1 }, category: { bsonType: "string" }, mcc: { bsonType: "int", minimum: 1000, maximum: 9999 }, city: { bsonType: "string" }, location: { bsonType: "object", required: ["type", "coordinates"], additionalProperties: false, properties: { type: { bsonType: "string", enum: ["Point"] }, coordinates: { bsonType: "array", minItems: 2, maxItemmaxItems: 2, items: { bsonType: ["double", "int", "long"] } } } }, feePct: { bsonType: "double", minimum: 0, maximum: 100 }, createdAt: dateBson } } } })
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794176708, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794176708, i: 1 })
+}
+rs0 [direct: primary] fasopay_tp> db.runCommand({ collMod: "transactions", validationLevel: "strict", validationAction: "error", validator: { $jsonSchema: { bsonType: "object", required: ["_id", "idempotencyKey", "type", "amount", "fee", "status", "channel", "createdAt", "riskScore", "flags"], additionalProperties: false, properties: { _id: idTexte, idempotencyKey: { bsonType: "string", minLength: 1 }, type: { bsobsonType: "string", enum: ["P2P", "MERCHANT_PAY", "CASH_IN", "CASH_OUT", "BILL"] }, fromWalletId: { bsonType: "string" }, toWalletId: { bsobsonType: "string" }, merchantId: { bsonType: "string" }, amount: montantPositif, fee: montant, status: { bsonType: "string", enum: ["COMPLETED", "FAILED", "REVERSED", "PENDING"] }, channel: { bsonType: "string", enum: ["USSD", "APP", "QR"] }, createdAt: dateBson, completedAt:dateBson, riskScore: { bsonType: "int", minimum: 0, maximum: 100 }, flags: { bsonType: "array", items: { bsonType: "string", enum: ["HIGH_AMOUNT", "INSUFFICIENT_FUNDS", "NEW_RECIPIENT", "NETWORK_ERROR", "NIGHT", "SUPPORT_REVERSAL"] } }, attempts: { bsonType: "array", items: { bbsonType: "object", required: ["n", "at", "result"], additionalProperties: false, properties: { n: { bsonType: "int", minimum: 1 }, at: dateBson, result: { bsonType: "string", enum: ["PROCESSED", "REPLAYED"] } } } } } } } })
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794176719, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794176719, i: 1 })
+}
+rs0 [direct: primary] fasopay_tp> db.runCommand({ collMod: "ledger_entries", validationLevel: "strict", validationAction: "error", validator: { $jsonSchema: { bsonType: "object", required: ["_id", "txId", "walletId", "direction", "amount", "createdAt"], additionalProperties: fafalse, properties: { _id: idTexte, txId: { bsonType: "string" }, walletId: { bsonType: ["string", "null"] }, account: { bsonType: "string", pattern: "^(FEES|FLOAT|BILLER|MERCHANT:M[0-9]{5})$" }, direction: { bsonType: "string", enum: ["DEBIT", "CREDIT"] }, amount: montantPositif, balanceAfter: montant, createdAt: dateBson }, oneOf: [{ properties: { walletId: { bsonType: "string" } }, required: ["balanceAfter"], not: { required: ["account"] } }, { properties: { walletId: { bsonType: "null" } }, required: ["account"], not: { required: ["balanceAfter"]} }] } } })
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794176728, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794176728, i: 1 })
+}
+rs0 [direct: primary] fasopay_tp> db.runCommand({ collMod: "outbox", validationLevel: "strict", validationAction: "error", validator: { $js$jsonSchema: { bsonType: "object", required: ["type", "txId", "status"], additionalProperties: false, properties: { _id: idTexte, type: { bbsonType: "string", enum: ["TRANSFER_COMPLETED"] }, txId: { bsonType: "string" }, status: { bsonType: "string", enum: ["PENDING", "SENT"] }, createdAt: dateBson, sentAt: dateBson } } } })
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794176743, i: 1 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794176743, i: 1 })
+}
+rs0 [direct: primary] fasopay_tp> ["customers", "wallets", "merchants", "transactions", "ledger_entries", "outbox"].forEach(function (n) {var s = db.getCollectionInfos({ name: n })[0].options.validator.$jsonSchema; print(n + " : " + db[n].countDocuments() + " documents, " + db[n].countDocuments({ $nor: [{ $jsonSchema: s }] }) + " invalides") })
+customers : 2000 documents, 0 invalides
+wallets : 2000 documents, 0 invalides
+merchants : 150 documents, 0 invalides
+transactions : 60000 documents, 0 invalides
+ledger_entries : 141939 documents, 0 invalides
+outbox : 0 documents, 0 invalides
+
+rs0 [direct: primary] fasopay_tp> ["customers", "wallets", "merchants", "transactions", "ledger_entries", "outbox"].forEach(function (n) {var o = db.getCollectionInfos({ name: n })[0].options; print(n + " : " + o.validationLevel + " / " + o.validationAction) })
+customers : strict / error
+wallets : strict / error
+merchants : strict / error
+transactions : strict / error
+ledger_entries : strict / error
+outbox : strict / error
+
+rs0 [direct: primary] fasopay_tp> try { db.customers.insertOne({ _id: "TEST_REJET", phone: "+22600000000", name: "Client Test", city: "Ouagadougou", kycLevel: "trois", segment: "GRAND_PUBLIC", createdAt: new Date() }); print("ACCEPTE (anormal)"); db.customers.deleteOne({ _id: "TEST_REJET" }) } catch (e) { print("customers : code " + e.code + " " + e.codeName); printjson(e.errInfo) }
+customers : code 121 undefined
+{
+  failingDocumentId: 'TEST_REJET',
+  details: {
+    operatorName: '$jsonSchema',
+    schemaRulesNotSatisfied: [
+      {
+        operatorName: 'properties',
+        propertiesNotSatisfied: [
+          {
+            propertyName: 'kycLevel',
+            details: [
+              {
+                operatorName: 'bsonType',
+                specifiedAs: {
+                  bsonType: 'int'
+                },
+                reason: 'type did not match',
+                consideredValue: 'trois',
+                consideredType: 'string'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+rs0 [direct: primary] fasopay_tp> try { db.wallets.insertOne({ _id: "TEST_REJET", customerId: "C000001", balance: 12.5, currency: "XOF", status: "ACTIVE", dailyLimit: 200000, version: 1, updatedAt: new Date() }); print("ACCEPTE (anormal)"); db.wallets.deleteOne({ _id: "TEST_REJET" }) } catch (e) { print("wallets : code " + e.code + " " + e.codeName); printjson(e.errInfo) }
+wallets : code 121 undefined
+{
+  failingDocumentId: 'TEST_REJET',
+  details: {
+    operatorName: '$jsonSchema',
+    schemaRulesNotSatisfied: [
+      {
+        operatorName: 'properties',
+        propertiesNotSatisfied: [
+          {
+            propertyName: 'balance',
+            details: [
+              {
+                operatorName: 'bsonType',
+                specifiedAs: {
+                  bsonType: [
+                    'int',
+                    'long'
+                  ]
+                },
+                reason: 'type did not match',
+                consideredValue: 12.5,
+                consideredType: 'double'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+rs0 [direct: primary] fasopay_tp> try { db.merchants.insertOne({ _id: "TEST_REJET", name: "Marchand Test", category: "Test", mcc: 5732, citcity: "Ouagadougou", location: { type: "Point", coordinates: [0.37, 12.09] }, feePct: "beaucoup", createdAt: new Date() }); print("ACCEPTE(anormal)"); db.merchants.deleteOne({ _id: "TEST_REJET" }) } catch (e) { print("merchants : code " + e.code + " " + e.codeName); printjson(e.errInfo) }
+merchants : code 121 undefined
+{
+  failingDocumentId: 'TEST_REJET',
+  details: {
+    operatorName: '$jsonSchema',
+    schemaRulesNotSatisfied: [
+      {
+        operatorName: 'properties',
+        propertiesNotSatisfied: [
+          {
+            propertyName: 'feePct',
+            details: [
+              {
+                operatorName: 'bsonType',
+                specifiedAs: {
+                  bsonType: 'double'
+                },
+                reason: 'type did not match',
+                consideredValue: 'beaucoup',
+                consideredType: 'string'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+rs0 [direct: primary] fasopay_tp> try { db.transactions.insertOne({ _id: "TEST_REJET", idempotencyKey: "idem-test", type: "P2P", amount: 12.5, fee: 0, status: "INCONNU", channel: "APP", createdAt: new Date(), riskScore: 10, flags: [] }); print("ACCEPTE (anormal)"); db.transactions.deleteOne({ _id: "TEST_REJET" }) } catch (e) { print("transactions : code " + e.code + " " + e.codeName); printjson(e.errInfo) }
+transactions : code 121 undefined
+{
+  failingDocumentId: 'TEST_REJET',
+  details: {
+    operatorName: '$jsonSchema',
+    schemaRulesNotSatisfied: [
+      {
+        operatorName: 'properties',
+        propertiesNotSatisfied: [
+          {
+            propertyName: 'amount',
+            details: [
+              {
+                operatorName: 'bsonType',
+                specifiedAs: {
+                  bsonType: [
+                    'int',
+                    'long'
+                  ]
+                },
+                reason: 'type did not match',
+                consideredValue: 12.5,
+                consideredType: 'double'
+              }
+            ]
+          },
+          {
+            propertyName: 'status',
+            details: [
+              {
+                operatorName: 'enum',
+                specifiedAs: {
+                  enum: [
+                    'COMPLETED',
+                    'FAILED',
+                    'REVERSED',
+                    'PENDING'
+                  ]
+                },
+                reason: 'value was not found in enum',
+                consideredValue: 'INCONNU'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+rs0 [direct: primary] fasopay_tp> try { db.ledger_entries.insertOne({ _id: "TEST_REJET", txId: "T0000001", walletId: null, direction: "DEBIT", amount: 100, createdAt: new Date() }); print("ACCEPTE (anormal)"); db.ledger_entries.deleteOne({ _id: "TEST_REJET" }) } catch (e) { print("ledger_entries : code " + e.code + " " + e.codeName); printjson(e.errInfo) }
+ledger_entries : code 121 undefined
+{
+  failingDocumentId: 'TEST_REJET',
+  details: {
+    operatorName: '$jsonSchema',
+    schemaRulesNotSatisfied: [
+      {
+        operatorName: 'oneOf',
+        schemasNotSatisfied: [
+          {
+            index: 0,
+            details: [
+              {
+                operatorName: 'properties',
+                propertiesNotSatisfied: [
+                  {
+                    propertyName: 'walletId',
+                    details: [
+                      {
+                        operatorName: 'bsonType',
+                        specifiedAs: {
+                          bsonType: 'string'
+                        },
+                        reason: 'type did not match',
+                        consideredValue: null,
+                        consideredType: 'null'
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                operatorName: 'required',
+                specifiedAs: {
+                  required: [
+                    'balanceAfter'
+                  ]
+                },
+                missingProperties: [
+                  'balanceAfter'
+                ]
+              }
+            ]
+          },
+          {
+            index: 1,
+            details: [
+              {
+                operatorName: 'required',
+                specifiedAs: {
+                  required: [
+                    'account'
+                  ]
+                },
+                missingProperties: [
+                  'account'
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+rs0 [direct: primary] fasopay_tp> try { db.outbox.insertOne({ _id: "TEST_REJET", type: "AUTRE_TYPE", txId: "T0000001", status: "PENDING" }); print("ACCEPTE (anormal)"); db.outbox.deleteOne({ _id: "TEST_REJET" }) } catch (e) { print("outbox : code " + e.code + " " + e.codeName); printjson(e.errInfo) }
+outbox : code 121 undefined
+{
+  failingDocumentId: 'TEST_REJET',
+  details: {
+    operatorName: '$jsonSchema',
+    schemaRulesNotSatisfied: [
+      {
+        operatorName: 'properties',
+        propertiesNotSatisfied: [
+          {
+            propertyName: 'type',
+            details: [
+              {
+                operatorName: 'enum',
+                specifiedAs: {
+                  enum: [
+                    'TRANSFER_COMPLETED'
+                  ]
+                },
+                reason: 'value was not found in enum',
+                consideredValue: 'AUTRE_TYPE'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+rs0 [direct: primary] fasopay_tp> db.getCollectionNames().sort().forEach(function (n) { print(n + " : " + db[n].countDocuments()) })
+customers : 2000
+fraud_alerts : 0
+ledger_entries : 141939
+merchants : 150
+outbox : 0
+transactions : 60000
+wallets : 2000
+
+rs0 [direct: primary] fasopay_tp> db.ledger_entries.aggregate([{ $match: { walletId: { $ne: null } } }, { $group: { _id: "$walletId", lignes: { $sum: 1 }, octets: { $sum: { $bsonSize: "$$ROOT" } } } }, { $group: { _id: null, wallets: { $sum: 1 }, lignesMoyennes: { $avg: "$lignes" }, lignesMax: { $max: "$lignes" }, octetsMoyens: { $avg: "$octets" }, octetsMax: { $max: "$octets" } } }])
+[
+  {
+    _id: null,
+    wallets: 2000,
+    lignesMoyennes: 35.9425,
+    lignesMax: 390,
+    octetsMoyens: 4830.551,
+    octetsMax: 52346
+  }
+]
+rs0 [direct: primary] fasopay_tp> exit
+
+What's next:
+    Try Docker Debug for seamless, persistent debugging tools in any container or image → docker debug mongo-rs1
+    Learn more at https://docs.docker.com/go/debug-cli/
+PS C:\Users\abdra\Documents\IFOAD\M2\BD-NOSQL\TP_FasoPay_G7> 

@@ -1,0 +1,11 @@
+Commande : docker exec mongo-rs1 mongosh fasopay_tp --quiet --eval "db.getCollectionNames().sort()"
+Date : Sun Nov  8 13:43:07 UTC 2026
+[
+  'customers',
+  'fraud_alerts',
+  'ledger_entries',
+  'merchants',
+  'outbox',
+  'transactions',
+  'wallets'
+]

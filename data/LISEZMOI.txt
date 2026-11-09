@@ -1,0 +1,15 @@
+Jeu de données du TP final FasoPay : groupe 07
+====================================================
+
+Ce dossier contient VOS données. Elles sont différentes de celles des autres groupes.
+
+  customers.ndjson        2000 clients
+  wallets.ndjson          2000 portefeuilles
+  merchants.ndjson        150 marchands
+  transactions.ndjson     60000 transactions
+  ledger_entries.ndjson   141939 lignes de grand livre (partie double)
+  fingerprint.json        comptages, sommes et empreintes SHA-256 de ces fichiers : à coller dans le rapport
+
+Format : NDJSON (un document JSON par ligne ; dates au format {"$date": "..."}). Base cible : fasopay_tp.
+Vous importez ces fichiers vous-même et vous vérifiez vous-même qu'ils correspondent au fingerprint
+(énoncé, section 3, exigences D1 à D4). Ne modifiez jamais ces fichiers.
