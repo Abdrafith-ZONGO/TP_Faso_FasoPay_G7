@@ -1,2 +1,9 @@
 # Exports automatiques de VS Code (extension PlantUML) : l image utile est dans rapport/
 out/
+
+# Fichiers de compilation LaTeX (refaits à chaque F5)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
