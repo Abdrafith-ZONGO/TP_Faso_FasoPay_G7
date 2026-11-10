@@ -1,0 +1,87 @@
+
+=== Partie 6 : les shards déclarés (config.shards) ===
+Commande : mongosh --quiet --eval "db.getSiblingDB('config').shards.find().forEach(printjson)"
+Date : Mon Nov  9 22:03:51 UTC 2026
+{
+  _id: 'rs-shard1',
+  host: 'rs-shard1/fasopay-shard1:27017',
+  state: 1,
+  topologyTime: Timestamp({ t: 1794261814, i: 10 }),
+  replSetConfigVersion: Long('-1')
+}
+{
+  _id: 'rs-shard2',
+  host: 'rs-shard2/fasopay-shard2:27017',
+  state: 1,
+  topologyTime: Timestamp({ t: 1794261814, i: 28 }),
+  replSetConfigVersion: Long('-1')
+}
+{
+  _id: 'rs-shard3',
+  host: 'rs-shard3/fasopay-shard3:27017',
+  state: 1,
+  topologyTime: Timestamp({ t: 1794261814, i: 51 }),
+  replSetConfigVersion: Long('-1')
+}
+
+=== Partie 6 : le mongos et son config server ===
+Commande : mongosh --quiet --eval "var h = db.hello(); print('ce processus : ' + h.msg + ', version ' + db.version()); print('config server utilisé : ' + db.adminCommand({ getCmdLineOpts: 1 }).parsed.sharding.configDB)"
+Date : Mon Nov  9 22:03:52 UTC 2026
+ce processus : isdbgrid, version 8.0.34
+config server utilisé : rs-cfg/fasopay-cfg:27017
+
+=== Partie 6 : sh.status() ===
+Commande : mongosh --quiet --eval "sh.status()"
+Date : Mon Nov  9 22:03:52 UTC 2026
+shardingVersion
+{ _id: 1, clusterId: ObjectId('6af24306888f7dd4ed81daa9') }
+---
+shards
+[
+  {
+    _id: 'rs-shard1',
+    host: 'rs-shard1/fasopay-shard1:27017',
+    state: 1,
+    topologyTime: Timestamp({ t: 1794261814, i: 10 }),
+    replSetConfigVersion: Long('-1')
+  },
+  {
+    _id: 'rs-shard2',
+    host: 'rs-shard2/fasopay-shard2:27017',
+    state: 1,
+    topologyTime: Timestamp({ t: 1794261814, i: 28 }),
+    replSetConfigVersion: Long('-1')
+  },
+  {
+    _id: 'rs-shard3',
+    host: 'rs-shard3/fasopay-shard3:27017',
+    state: 1,
+    topologyTime: Timestamp({ t: 1794261814, i: 51 }),
+    replSetConfigVersion: Long('-1')
+  }
+]
+---
+active mongoses
+[ { '8.0.34': 1 } ]
+---
+autosplit
+{ 'Currently enabled': 'yes' }
+---
+balancer
+{
+  'Currently enabled': 'yes',
+  'Currently running': 'no',
+  'Failed balancer rounds in last 5 attempts': 0,
+  'Migration Results for the last 24 hours': 'No recent migrations'
+}
+---
+shardedDataDistribution
+[]
+---
+databases
+[
+  {
+    database: { _id: 'config', primary: 'config', partitioned: true },
+    collections: {}
+  }
+]

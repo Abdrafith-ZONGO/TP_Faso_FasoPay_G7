@@ -2,3 +2,5 @@
 
 1. Partie 2, E3 : l'outil a fourni une requête de courbe de Pareto qui a échoué sur notre serveur (erreur `$documentNumber must be specified with a top level sortBy expression with exactly one element`), parce qu'elle triait sur deux champs. Nous avons refait la session après correction (tri sur `ca` seul, avec un contrôle que les 150 CA sont distincts).
 2. (en réserve) Partie 0 : l'outil nous a fait taper Object.bsonsize(), fonction qui n'existe pas dans mongosh 2.14.0 (TypeError dans preuves/00-dimensionnement.txt) ; nous avons refait la mesure avec $bsonSize dans un pipeline d'agrégation.
+3. Partie 6 : le script fourni par l'outil comptait les documents de chaque shard avec `$collStats`, qui compte aussi les copies laissées sur le shard de départ après un `sh.moveChunk` (documents orphelins, supprimés seulement après `orphanCleanupDelaySecs`, 900 s). Nos preuves affichaient ainsi 100 000 documents au lieu de 60 000 après correction des clés à plages. Nous l'avons repéré en relisant les chiffres, puis mesuré la vraie répartition avec `$shardedDataDistribution`, qui sépare documents possédés et orphelins (`preuves/06-orphelins.txt`).
+

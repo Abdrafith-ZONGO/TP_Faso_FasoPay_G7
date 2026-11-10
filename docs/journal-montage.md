@@ -861,3 +861,147 @@ docker cp fasopay-client:/tmp/preuves/04-concurrence-rs3.txt preuves/04-concurre
 
 Résultat : pendant les deux séries, `fasopay-noeud3` est PRIMARY, les deux autres SECONDARY, majorité d'écriture de 2. Tests du contrat : 36 vérifications OK sur 36. Concurrence : 10 vérifications OK sur 10 (30 virements acceptés, 13 pour le client A et 17 pour le client B, solde final 0, monnaie conservée, ledger = 60, outbox = 30, 5 conflits rejoués ; même clé envoyée par les deux clients : un seul virement). Preuves : `preuves/04-transaction-rs3.txt` (date `Mon Nov  9 21:35:44 UTC 2026`) et `preuves/04-concurrence-rs3.txt` (date `Mon Nov  9 21:35:53 UTC 2026`).
 
+## 19. Cluster shardé (Partie 6)
+
+Objectif : monter un troisième environnement, un cluster shardé complet : un config server, trois shards et un routeur `mongos`, sur un réseau Docker dédié. Chaque pièce est un Replica Set d'un seul nœud (un nœud par shard suffit pour ce banc, d'après l'énoncé). Le Replica Set de la Partie 5 a été arrêté (`docker stop`) une fois ses preuves faites, pour laisser la mémoire au cluster ; ses volumes sont conservés.
+
+### 19.1 Réseau, config server et shards
+
+```powershell
+docker network create reseau-cluster
+docker run -d --name fasopay-cfg --network reseau-cluster -v fasopay-cfg-data:/data/configdb mongo:8.0 --configsvr --replSet rs-cfg --port 27017 --bind_ip_all --wiredTigerCacheSizeGB 0.25
+docker run -d --name fasopay-shard1 --network reseau-cluster -v fasopay-shard1-data:/data/db mongo:8.0 --shardsvr --replSet rs-shard1 --port 27017 --bind_ip_all --wiredTigerCacheSizeGB 0.25
+docker run -d --name fasopay-shard2 --network reseau-cluster -v fasopay-shard2-data:/data/db mongo:8.0 --shardsvr --replSet rs-shard2 --port 27017 --bind_ip_all --wiredTigerCacheSizeGB 0.25
+docker run -d --name fasopay-shard3 --network reseau-cluster -v fasopay-shard3-data:/data/db mongo:8.0 --shardsvr --replSet rs-shard3 --port 27017 --bind_ip_all --wiredTigerCacheSizeGB 0.25
+```
+
+Rôle des nouvelles options :
+
+| Option | Rôle |
+|---|---|
+| `--configsvr` | serveur de configuration : garde la carte du cluster (quels chunks sur quels shards) |
+| `--shardsvr` | shard : garde une partie des données |
+| `--replSet rs-cfg`, `rs-shard1`, ... | chaque pièce est un Replica Set (exigé par MongoDB), ici d'un seul nœud |
+| `--port 27017` | sans cette option, un config server écoute sur 27019 et un shard sur 27018 ; nous imposons 27017 partout pour simplifier les adresses |
+| `-v fasopay-cfg-data:/data/configdb` | un config server range ses données dans `/data/configdb` |
+
+Vérification :
+
+```powershell
+docker ps --format "table {{.Names}}	{{.Status}}	{{.Networks}}"
+docker stats --no-stream --format "table {{.Name}}	{{.MemUsage}}"
+```
+
+Résultat : `fasopay-cfg`, `fasopay-shard1`, `fasopay-shard2` et `fasopay-shard3` « Up » sur `reseau-cluster`, de 94 à 101 Mo chacun au démarrage.
+
+### 19.2 Initialisation, routeur mongos et déclaration des shards
+
+Initialisation des quatre Replica Sets (le config server est déclaré comme tel par `configsvr: true`) :
+
+```powershell
+docker exec fasopay-cfg mongosh --quiet --eval "rs.initiate({_id: 'rs-cfg', configsvr: true, members: [{_id: 0, host: 'fasopay-cfg:27017'}]})"
+docker exec fasopay-shard1 mongosh --quiet --eval "rs.initiate({_id: 'rs-shard1', members: [{_id: 0, host: 'fasopay-shard1:27017'}]})"
+docker exec fasopay-shard2 mongosh --quiet --eval "rs.initiate({_id: 'rs-shard2', members: [{_id: 0, host: 'fasopay-shard2:27017'}]})"
+docker exec fasopay-shard3 mongosh --quiet --eval "rs.initiate({_id: 'rs-shard3', members: [{_id: 0, host: 'fasopay-shard3:27017'}]})"
+```
+
+Démarrage du routeur, relié au config server, puis déclaration des trois shards :
+
+```powershell
+docker run -d --name fasopay-mongos --network reseau-cluster mongo:8.0 mongos --configdb rs-cfg/fasopay-cfg:27017 --bind_ip_all --port 27017
+docker exec fasopay-mongos mongosh --quiet --eval "printjson(sh.addShard('rs-shard1/fasopay-shard1:27017')); printjson(sh.addShard('rs-shard2/fasopay-shard2:27017')); printjson(sh.addShard('rs-shard3/fasopay-shard3:27017'))"
+```
+
+| Morceau | Rôle |
+|---|---|
+| `configsvr: true` | dans `rs.initiate`, déclare ce Replica Set comme config server |
+| `mongo:8.0 mongos` | lance le routeur `mongos` au lieu d'un `mongod` : il ne stocke rien, il aiguille les requêtes vers les shards |
+| `--configdb rs-cfg/fasopay-cfg:27017` | indique au mongos où trouver la carte du cluster |
+| `sh.addShard('rs-shard1/fasopay-shard1:27017')` | ajoute un shard, désigné par son Replica Set et son adresse |
+
+Copie du code dans le mongos, preuve (mode `cluster` de `code/06-lancer.sh`) et récupération :
+
+```powershell
+docker cp code/. fasopay-mongos:/tmp/code/
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh cluster
+docker cp fasopay-mongos:/tmp/preuves/06-cluster.txt preuves/06-cluster.txt
+```
+
+Résultat : `ok: 1` pour les quatre initialisations ; `shardAdded` pour `rs-shard1`, `rs-shard2` et `rs-shard3`. `config.shards` liste les trois shards (état 1) ; le mongos (`isdbgrid`, version 8.0.34) utilise le config server `rs-cfg/fasopay-cfg:27017` ; `sh.status()` montre les trois shards, un mongos actif et le balancer activé. Preuve : `preuves/06-cluster.txt` (date `Mon Nov  9 22:03:51 UTC 2026`).
+
+### 19.3 Évaluation des quatre clés de sharding
+
+Objectif : pour chaque clé candidate, une collection de la base `fasopay_shard`, shardée AVANT l'import, puis les 60 000 transactions importées à travers le mongos ; mesure de la répartition, correction d'une clé à plages, trafic de demain, et lecture des `explain()`. Tout est enchaîné par le mode `cle` de `code/06-lancer.sh` (fonctions dans `code/06-cles.js`).
+
+| Nom | Collection | Clé |
+|---|---|---|
+| `date` | `tx_date` | `{ createdAt: 1 }` |
+| `wallet` | `tx_wallet` | `{ fromWalletId: 1 }` |
+| `hash` | `tx_hash` | `{ fromWalletId: "hashed" }` |
+| `composee` | `tx_comp` | `{ fromWalletId: 1, createdAt: 1 }` |
+
+Copie des transactions et du code dans le mongos :
+
+```powershell
+docker exec fasopay-mongos mkdir -p /tmp/data
+docker cp data/transactions.ndjson fasopay-mongos:/tmp/data/transactions.ndjson
+docker cp code/. fasopay-mongos:/tmp/code/
+```
+
+Évaluation des quatre clés, puis récupération des preuves :
+
+```powershell
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh cle date
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh cle wallet
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh cle hash
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh cle composee
+docker cp fasopay-mongos:/tmp/preuves/06-cle-date.txt preuves/06-cle-date.txt
+docker cp fasopay-mongos:/tmp/preuves/06-cle-wallet.txt preuves/06-cle-wallet.txt
+docker cp fasopay-mongos:/tmp/preuves/06-cle-hash.txt preuves/06-cle-hash.txt
+docker cp fasopay-mongos:/tmp/preuves/06-cle-composee.txt preuves/06-cle-composee.txt
+```
+
+Pour chaque clé, le script exécute, dans l'ordre : `sh.shardCollection` sur la collection vide ; `mongoimport --host localhost:27017 --db fasopay_shard --collection <collection> --file /tmp/data/transactions.ndjson` ; la répartition par shard (`$collStats`) et les chunks par shard (`config.chunks`) ; pour les clés à plages, deux découpes (`sh.splitAt`) au tiers et aux deux tiers des documents, puis deux déplacements (`sh.moveChunk`) ; l'insertion de 3 000 transactions datées du jour, copiées d'un échantillon réel ; enfin les `explain("executionStats")` des requêtes de l'énoncé, à travers le mongos.
+
+Résultat :
+- Les quatre imports : 60 000 documents, 0 échec.
+- Clés à plages (`date`, `wallet`, `composee`) : après l'import, 100 % des documents sur `rs-shard2`, en un seul chunk ; après découpe et déplacement, un chunk par shard.
+- Clé `hash` : répartie dès l'import (47,4 %, 25,2 %, 27,4 %), sans correction ; les 13 505 dépôts sans `fromWalletId` ont tous la même valeur de clé.
+- Trafic de demain : clé `date`, 100 % des 3 000 nouvelles transactions sur `rs-shard3` ; clé `wallet`, 33,1 %, 33,4 %, 33,5 % ; clé `hash`, 48,0 %, 25,4 %, 26,6 % ; clé `composee`, 33,1 %, 33,7 %, 33,2 %.
+- Preuves : `preuves/06-cle-date.txt` (date `Mon Nov  9 23:17:45 UTC 2026`), `preuves/06-cle-wallet.txt` (23:17:55), `preuves/06-cle-hash.txt` (23:18:08), `preuves/06-cle-composee.txt` (23:18:21).
+
+Remarque : pour les clés à plages, la répartition « après correction » affiche 100 000 documents au lieu de 60 000 (par exemple 20 000, 60 000 et 20 000 pour la clé `date`). `$collStats` compte aussi les copies que le shard de départ garde après un `sh.moveChunk` (documents orphelins), en attendant leur suppression en arrière-plan. Les requêtes ne sont pas faussées (l'étape `SHARDING_FILTER` des `explain()` écarte ces copies : voir `chunkSkips`), mais le comptage l'est. La section 19.4 mesure les documents possédés et orphelins par shard.
+
+### 19.4 Documents possédés et documents orphelins
+
+Objectif : expliquer les 100 000 documents comptés après correction des clés à plages. Après un `sh.moveChunk`, le shard de départ garde une copie des documents déplacés ; MongoDB ne la supprime qu'après un délai (`orphanCleanupDelaySecs`), pour ne pas gêner les lectures encore en cours sur l'ancien emplacement. Le mode `orphelins` de `code/06-lancer.sh` lit ce délai et les suppressions en attente sur chaque shard, puis la répartition par shard avec `$shardedDataDistribution`, qui sépare les documents possédés des orphelins.
+
+```powershell
+docker cp code/. fasopay-mongos:/tmp/code/
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh orphelins
+docker cp fasopay-mongos:/tmp/preuves/06-orphelins.txt preuves/06-orphelins.txt
+```
+
+Résultat (23:22:43, moins de 15 minutes après les déplacements de 23:17:49) : délai de 900 s sur les trois shards ; 6 suppressions en attente sur `rs-shard2` (2 par collection à plages). Documents possédés : `tx_date` 20 000, 20 000 et 23 000 ; `tx_wallet` 20 950, 20 999 et 21 051 ; `tx_comp` 20 994, 21 011 et 20 995 ; `tx_hash` 29 892, 15 883 et 17 225. Orphelins : 40 000 (40 004 pour `tx_wallet`) sur `rs-shard2` pour chaque collection à plages, 0 ailleurs. La correction a donc bien réparti un tiers des documents par shard ; les comptages « après correction » des preuves `06-cle-*` comptaient en plus les orphelins. Preuve : `preuves/06-orphelins.txt` (date `Mon Nov  9 23:22:42 UTC 2026`).
+
+Même mesure, relancée après la fin du délai de 900 s :
+
+```powershell
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh orphelins
+docker cp fasopay-mongos:/tmp/preuves/06-orphelins.txt preuves/06-orphelins-apres.txt
+```
+
+Résultat (23:36:16) : plus aucune suppression en attente, 0 orphelin sur les trois shards ; les documents possédés sont inchangés. MongoDB a supprimé seul les copies, une fois le délai écoulé. Preuve : `preuves/06-orphelins-apres.txt` (date `Mon Nov  9 23:36:16 UTC 2026`).
+
+### 19.5 Évaluation de la clé recommandée : `{ walletCle: "hashed" }`
+
+Objectif : les quatre premières évaluations montrent que les 13 505 dépôts (`CASH_IN`) n'ont pas de `fromWalletId`, donc partagent une même valeur de clé. Nous évaluons une cinquième clé, hachée sur un champ toujours présent : `walletCle` = `fromWalletId`, ou `toWalletId` quand il n'y a pas d'émetteur. La collection `tx_cible` est shardée avant d'être remplie ; les 60 000 transactions d'origine (lues dans `tx_date`, sans les 3 000 ajoutées par le test du trafic de demain) y sont écrites à travers le mongos, par lots de 1 000, avec le champ `walletCle` (fonction `charger` de `code/06-cles.js`). `mongoimport` n'est pas utilisable ici, puisque le fichier d'origine ne contient pas ce champ ; le fichier `data/transactions.ndjson` n'est pas modifié.
+
+```powershell
+docker cp code/. fasopay-mongos:/tmp/code/
+docker exec fasopay-mongos sh /tmp/code/06-lancer.sh cle cible
+docker cp fasopay-mongos:/tmp/preuves/06-cle-cible.txt preuves/06-cle-cible.txt
+```
+
+Résultat : 60 000 transactions écrites ; 0 document sans `walletCle` ; répartition 32,2 %, 32,6 % et 35,2 % sans aucune correction ; trafic du jour 31,6 %, 34,3 % et 34,1 % ; l'historique d'un wallet par `walletCle` est ciblé sur un seul shard (`SINGLE_SHARD`, 409 documents examinés pour 409 rendus). Preuve : `preuves/06-cle-cible.txt` (date `Mon Nov  9 23:44:47 UTC 2026`).
+

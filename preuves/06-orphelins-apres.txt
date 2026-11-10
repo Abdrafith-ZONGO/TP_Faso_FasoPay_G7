@@ -1,0 +1,27 @@
+
+=== Partie 6 : délai avant suppression des orphelins et tâches de suppression en attente, sur chaque shard ===
+Commande : for h in fasopay-shard1 fasopay-shard2 fasopay-shard3; do mongosh --host $h --quiet --eval "print('$h : orphanCleanupDelaySecs = ' + db.adminCommand({ getParameter: 1, orphanCleanupDelaySecs: 1 }).orphanCleanupDelaySecs + ' s ; suppressions en attente : ' + db.getSiblingDB('config').rangeDeletions.countDocuments())"; done
+Date : Mon Nov  9 23:36:16 UTC 2026
+fasopay-shard1 : orphanCleanupDelaySecs = 900 s ; suppressions en attente : 0
+fasopay-shard2 : orphanCleanupDelaySecs = 900 s ; suppressions en attente : 0
+fasopay-shard3 : orphanCleanupDelaySecs = 900 s ; suppressions en attente : 0
+
+=== Partie 6 : documents possédés et orphelins par shard ($shardedDataDistribution) ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); orphelins()"
+Date : Mon Nov  9 23:36:17 UTC 2026
+fasopay_shard.tx_comp
+  rs-shard1 : 20994 documents possédés, 0 orphelins
+  rs-shard2 : 21011 documents possédés, 0 orphelins
+  rs-shard3 : 20995 documents possédés, 0 orphelins
+fasopay_shard.tx_date
+  rs-shard1 : 20000 documents possédés, 0 orphelins
+  rs-shard2 : 20000 documents possédés, 0 orphelins
+  rs-shard3 : 23000 documents possédés, 0 orphelins
+fasopay_shard.tx_hash
+  rs-shard1 : 29892 documents possédés, 0 orphelins
+  rs-shard2 : 15883 documents possédés, 0 orphelins
+  rs-shard3 : 17225 documents possédés, 0 orphelins
+fasopay_shard.tx_wallet
+  rs-shard1 : 20950 documents possédés, 0 orphelins
+  rs-shard2 : 20999 documents possédés, 0 orphelins
+  rs-shard3 : 21051 documents possédés, 0 orphelins

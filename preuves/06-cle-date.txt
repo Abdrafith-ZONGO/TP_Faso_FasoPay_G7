@@ -1,0 +1,2913 @@
+
+=== Partie 6, clé date : création de la collection et sharding AVANT l'import ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); creer('date')"
+Date : Mon Nov  9 23:17:45 UTC 2026
+{
+  collectionsharded: 'fasopay_shard.tx_date',
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266266, i: 47 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266266, i: 46 })
+}
+collection fasopay_shard.tx_date shardée sur {"createdAt":1}
+
+=== Partie 6, clé date : import des 60 000 transactions à travers le mongos ===
+Commande : mongoimport --host localhost:27017 --db fasopay_shard --collection tx_date --file /tmp/data/transactions.ndjson
+Date : Mon Nov  9 23:17:46 UTC 2026
+2026-11-09T23:17:46.599+0000	connected to: mongodb://localhost:27017/
+2026-11-09T23:17:48.563+0000	60000 document(s) imported successfully. 0 document(s) failed to import.
+
+=== Partie 6, clé date : répartition après l'import ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); repartition('date', 'après import')"
+Date : Mon Nov  9 23:17:48 UTC 2026
+répartition « après import » : 60000 documents
+  rs-shard1 : 0 documents (0.0 %), 0 chunk(s)
+  rs-shard2 : 60000 documents (100.0 %), 1 chunk(s)
+  rs-shard3 : 0 documents (0.0 %), 0 chunk(s)
+
+=== Partie 6, clé date : correction d'une clé à plages (découpe et déplacement de chunks) ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); corriger('date')"
+Date : Mon Nov  9 23:17:49 UTC 2026
+taille de chunk configurée : null (absente = valeur par défaut, 128 Mo)
+points de découpe (au tiers et aux deux tiers des documents triés par la clé) : {"createdAt":"2026-02-27T13:20:59.630Z"} et {"createdAt":"2026-04-30T16:13:19.328Z"}
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266269, i: 7 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266269, i: 6 })
+}
+{
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266269, i: 12 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266269, i: 12 })
+}
+shard qui détenait tout : rs-shard2 ; déplacements vers rs-shard1 et rs-shard3
+{
+  millis: 434,
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266270, i: 4 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266270, i: 4 })
+}
+{
+  millis: 454,
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266270, i: 1086 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266270, i: 1086 })
+}
+
+=== Partie 6, clé date : répartition après correction ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); repartition('date', 'après correction')"
+Date : Mon Nov  9 23:17:50 UTC 2026
+répartition « après correction » : 100000 documents
+  rs-shard1 : 20000 documents (20.0 %), 1 chunk(s)
+  rs-shard2 : 60000 documents (60.0 %), 1 chunk(s)
+  rs-shard3 : 20000 documents (20.0 %), 1 chunk(s)
+
+=== Partie 6, clé date : le trafic de demain (3 000 transactions datées d'aujourd'hui) ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); traficNouveau('date')"
+Date : Mon Nov  9 23:17:50 UTC 2026
+3 000 transactions nouvelles insérées, datées du 2026-11-09T23:17:51.309Z :
+  rs-shard1 : 0 nouvelles (0.0 %)
+  rs-shard2 : 0 nouvelles (0.0 %)
+  rs-shard3 : 3000 nouvelles (100.0 %)
+
+=== Partie 6, clé date : répartition finale ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); repartition('date', 'finale')"
+Date : Mon Nov  9 23:17:51 UTC 2026
+répartition « finale » : 103000 documents
+  rs-shard1 : 20000 documents (19.4 %), 1 chunk(s)
+  rs-shard2 : 60000 documents (58.3 %), 1 chunk(s)
+  rs-shard3 : 23000 documents (22.3 %), 1 chunk(s)
+
+=== Partie 6, clé date : requêtes ciblées ou dispersées (explain à travers le mongos) ===
+Commande : mongosh --quiet --eval "load('/tmp/code/06-cles.js'); expliquer('date')"
+Date : Mon Nov  9 23:17:51 UTC 2026
+historique d'un wallet (fromWalletId = W000612) | stage SHARD_MERGE_SORT | 3 shard(s) interrogé(s) | rs-shard1 : 20000 documents examinés, 130 rendus ; rs-shard3 : 23000 documents examinés, 106 rendus ; rs-shard2 : 60000 documents examinés, 95 rendus | total rendu : 331
+historique complet d'un wallet ($or émetteur / destinataire) | stage SHARD_MERGE_SORT | 3 shard(s) interrogé(s) | rs-shard1 : 20000 documents examinés, 163 rendus ; rs-shard3 : 23000 documents examinés, 132 rendus ; rs-shard2 : 60000 documents examinés, 123 rendus | total rendu : 418
+une transaction par _id (T0002044) | stage SHARD_MERGE | 3 shard(s) interrogé(s) | rs-shard1 : 0 documents examinés, 0 rendus ; rs-shard2 : 1 documents examinés, 1 rendus ; rs-shard3 : 0 documents examinés, 0 rendus | total rendu : 1
+paiements du marchand M00044 en mars 2026 | stage SINGLE_SHARD | 1 shard(s) interrogé(s) | rs-shard1 : 9816 documents examinés, 762 rendus | total rendu : 762
+toutes les transactions du 30 janvier 2026 | stage SINGLE_SHARD | 1 shard(s) interrogé(s) | rs-shard2 : 599 documents examinés, 599 rendus | total rendu : 599
+tous les paiements du marchand M00044 (cas du marchand qui fait 25 % du volume) | stage SHARD_MERGE | 3 shard(s) interrogé(s) | rs-shard3 : 23000 documents examinés, 1757 rendus ; rs-shard1 : 20000 documents examinés, 1555 rendus ; rs-shard2 : 60000 documents examinés, 1396 rendus | total rendu : 4708
+CA par marchand (agrégation) | fusion : mongos | chaque shard exécute : $match > $group | le mongos (ou le shard de fusion) exécute : $mergeCursors > $group > $sort | shards interrogés : rs-shard3, rs-shard1, rs-shard2
+
+---- explain() complets (JSON) ----
+
+## historique d'un wallet (fromWalletId = W000612)
+{
+  queryPlanner: {
+    winningPlan: {
+      stage: 'SHARD_MERGE_SORT',
+      shards: [
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard1',
+          connectionString: 'rs-shard1/fasopay-shard1:27017',
+          serverInfo: {
+            host: '4ced0001e3fa',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            fromWalletId: {
+              '$eq': 'W000612'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: 'AA1C202E',
+          planCacheShapeHash: 'AA1C202E',
+          planCacheKey: 'B8C8C02E',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              inputStage: {
+                stage: 'IXSCAN',
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'backward',
+                indexBounds: {
+                  createdAt: [
+                    '[MaxKey, MinKey]'
+                  ]
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard3',
+          connectionString: 'rs-shard3/fasopay-shard3:27017',
+          serverInfo: {
+            host: '91bbc888d1f0',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            fromWalletId: {
+              '$eq': 'W000612'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: 'AA1C202E',
+          planCacheShapeHash: 'AA1C202E',
+          planCacheKey: 'B8C8C02E',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              inputStage: {
+                stage: 'IXSCAN',
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'backward',
+                indexBounds: {
+                  createdAt: [
+                    '[MaxKey, MinKey]'
+                  ]
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard2',
+          connectionString: 'rs-shard2/fasopay-shard2:27017',
+          serverInfo: {
+            host: '9a61433ca112',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            fromWalletId: {
+              '$eq': 'W000612'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: 'AA1C202E',
+          planCacheShapeHash: 'AA1C202E',
+          planCacheKey: 'B8C8C02E',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              inputStage: {
+                stage: 'IXSCAN',
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'backward',
+                indexBounds: {
+                  createdAt: [
+                    '[MaxKey, MinKey]'
+                  ]
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        }
+      ]
+    }
+  },
+  executionStats: {
+    nReturned: 331,
+    executionTimeMillis: 50,
+    totalKeysExamined: 103000,
+    totalDocsExamined: 103000,
+    executionStages: {
+      stage: 'SHARD_MERGE_SORT',
+      nReturned: 331,
+      executionTimeMillis: 50,
+      totalKeysExamined: 103000,
+      totalDocsExamined: 103000,
+      totalChildMillis: Long('83'),
+      shards: [
+        {
+          shardName: 'rs-shard1',
+          executionSuccess: true,
+          nReturned: 130,
+          executionTimeMillis: 16,
+          totalKeysExamined: 20000,
+          totalDocsExamined: 20000,
+          executionStages: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            nReturned: 130,
+            executionTimeMillisEstimate: 9,
+            works: 20001,
+            advanced: 130,
+            needTime: 19870,
+            needYield: 0,
+            saveState: 0,
+            restoreState: 0,
+            isEOF: 1,
+            chunkSkips: 0,
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              nReturned: 130,
+              executionTimeMillisEstimate: 9,
+              works: 20001,
+              advanced: 130,
+              needTime: 19870,
+              needYield: 0,
+              saveState: 0,
+              restoreState: 0,
+              isEOF: 1,
+              docsExamined: 20000,
+              alreadyHasObj: 0,
+              inputStage: {
+                stage: 'IXSCAN',
+                nReturned: 20000,
+                executionTimeMillisEstimate: 9,
+                works: 20001,
+                advanced: 20000,
+                needTime: 0,
+                needYield: 0,
+                saveState: 0,
+                restoreState: 0,
+                isEOF: 1,
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'backward',
+                indexBounds: {
+                  createdAt: [
+                    '[MaxKey, MinKey]'
+                  ]
+                },
+                keysExamined: 20000,
+                seeks: 1,
+                dupsTested: 0,
+                dupsDropped: 0
+              }
+            }
+          }
+        },
+        {
+          shardName: 'rs-shard3',
+          executionSuccess: true,
+          nReturned: 106,
+          executionTimeMillis: 18,
+          totalKeysExamined: 23000,
+          totalDocsExamined: 23000,
+          executionStages: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            nReturned: 106,
+            executionTimeMillisEstimate: 9,
+            works: 23001,
+            advanced: 106,
+            needTime: 22894,
+            needYield: 0,
+            saveState: 0,
+            restoreState: 0,
+            isEOF: 1,
+            chunkSkips: 0,
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              nReturned: 106,
+              executionTimeMillisEstimate: 9,
+              works: 23001,
+              advanced: 106,
+              needTime: 22894,
+              needYield: 0,
+              saveState: 0,
+              restoreState: 0,
+              isEOF: 1,
+              docsExamined: 23000,
+              alreadyHasObj: 0,
+              inputStage: {
+                stage: 'IXSCAN',
+                nReturned: 23000,
+                executionTimeMillisEstimate: 0,
+                works: 23001,
+                advanced: 23000,
+                needTime: 0,
+                needYield: 0,
+                saveState: 0,
+                restoreState: 0,
+                isEOF: 1,
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'backward',
+                indexBounds: {
+                  createdAt: [
+                    '[MaxKey, MinKey]'
+                  ]
+                },
+                keysExamined: 23000,
+                seeks: 1,
+                dupsTested: 0,
+                dupsDropped: 0
+              }
+            }
+          }
+        },
+        {
+          shardName: 'rs-shard2',
+          executionSuccess: true,
+          nReturned: 95,
+          executionTimeMillis: 49,
+          totalKeysExamined: 60000,
+          totalDocsExamined: 60000,
+          executionStages: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            nReturned: 95,
+            executionTimeMillisEstimate: 49,
+            works: 60001,
+            advanced: 95,
+            needTime: 59905,
+            needYield: 0,
+            saveState: 2,
+            restoreState: 2,
+            isEOF: 1,
+            chunkSkips: 224,
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              nReturned: 319,
+              executionTimeMillisEstimate: 49,
+              works: 60001,
+              advanced: 319,
+              needTime: 59681,
+              needYield: 0,
+              saveState: 2,
+              restoreState: 2,
+              isEOF: 1,
+              docsExamined: 60000,
+              alreadyHasObj: 0,
+              inputStage: {
+                stage: 'IXSCAN',
+                nReturned: 60000,
+                executionTimeMillisEstimate: 15,
+                works: 60001,
+                advanced: 60000,
+                needTime: 0,
+                needYield: 0,
+                saveState: 2,
+                restoreState: 2,
+                isEOF: 1,
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'backward',
+                indexBounds: {
+                  createdAt: [
+                    '[MaxKey, MinKey]'
+                  ]
+                },
+                keysExamined: 60000,
+                seeks: 1,
+                dupsTested: 0,
+                dupsDropped: 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  queryShapeHash: 'E47B18D14CC324C612461B30BAFEB723D3F199E3CC40B9C2EDA9EABFCB6A89BF',
+  serverInfo: {
+    host: 'e78a269d061a',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  command: {
+    find: 'tx_date',
+    filter: {
+      fromWalletId: 'W000612'
+    },
+    sort: {
+      createdAt: -1
+    },
+    lsid: {
+      id: UUID('e4e46cc1-79e6-432b-8a41-6a750ad391c3')
+    },
+    '$clusterTime': {
+      clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+      signature: {
+        hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+        keyId: 0
+      }
+    },
+    '$db': 'fasopay_shard'
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266271, i: 6 })
+}
+
+## historique complet d'un wallet ($or émetteur / destinataire)
+{
+  queryPlanner: {
+    winningPlan: {
+      stage: 'SHARD_MERGE_SORT',
+      shards: [
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard1',
+          connectionString: 'rs-shard1/fasopay-shard1:27017',
+          serverInfo: {
+            host: '4ced0001e3fa',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            '$or': [
+              {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              {
+                toWalletId: {
+                  '$eq': 'W000612'
+                }
+              }
+            ]
+          },
+          indexFilterSet: false,
+          queryHash: '6B9A11C1',
+          planCacheShapeHash: '6B9A11C1',
+          planCacheKey: '73AD81B5',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SUBPLAN',
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              inputStage: {
+                stage: 'FETCH',
+                filter: {
+                  '$or': [
+                    {
+                      fromWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    },
+                    {
+                      toWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    }
+                  ]
+                },
+                inputStage: {
+                  stage: 'IXSCAN',
+                  keyPattern: {
+                    createdAt: 1
+                  },
+                  indexName: 'createdAt_1',
+                  isMultiKey: false,
+                  multiKeyPaths: {
+                    createdAt: []
+                  },
+                  isUnique: false,
+                  isSparse: false,
+                  isPartial: false,
+                  indexVersion: 2,
+                  direction: 'backward',
+                  indexBounds: {
+                    createdAt: [
+                      '[MaxKey, MinKey]'
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard3',
+          connectionString: 'rs-shard3/fasopay-shard3:27017',
+          serverInfo: {
+            host: '91bbc888d1f0',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            '$or': [
+              {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              {
+                toWalletId: {
+                  '$eq': 'W000612'
+                }
+              }
+            ]
+          },
+          indexFilterSet: false,
+          queryHash: '6B9A11C1',
+          planCacheShapeHash: '6B9A11C1',
+          planCacheKey: '73AD81B5',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SUBPLAN',
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              inputStage: {
+                stage: 'FETCH',
+                filter: {
+                  '$or': [
+                    {
+                      fromWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    },
+                    {
+                      toWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    }
+                  ]
+                },
+                inputStage: {
+                  stage: 'IXSCAN',
+                  keyPattern: {
+                    createdAt: 1
+                  },
+                  indexName: 'createdAt_1',
+                  isMultiKey: false,
+                  multiKeyPaths: {
+                    createdAt: []
+                  },
+                  isUnique: false,
+                  isSparse: false,
+                  isPartial: false,
+                  indexVersion: 2,
+                  direction: 'backward',
+                  indexBounds: {
+                    createdAt: [
+                      '[MaxKey, MinKey]'
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard2',
+          connectionString: 'rs-shard2/fasopay-shard2:27017',
+          serverInfo: {
+            host: '9a61433ca112',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            '$or': [
+              {
+                fromWalletId: {
+                  '$eq': 'W000612'
+                }
+              },
+              {
+                toWalletId: {
+                  '$eq': 'W000612'
+                }
+              }
+            ]
+          },
+          indexFilterSet: false,
+          queryHash: '6B9A11C1',
+          planCacheShapeHash: '6B9A11C1',
+          planCacheKey: '73AD81B5',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SUBPLAN',
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              inputStage: {
+                stage: 'FETCH',
+                filter: {
+                  '$or': [
+                    {
+                      fromWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    },
+                    {
+                      toWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    }
+                  ]
+                },
+                inputStage: {
+                  stage: 'IXSCAN',
+                  keyPattern: {
+                    createdAt: 1
+                  },
+                  indexName: 'createdAt_1',
+                  isMultiKey: false,
+                  multiKeyPaths: {
+                    createdAt: []
+                  },
+                  isUnique: false,
+                  isSparse: false,
+                  isPartial: false,
+                  indexVersion: 2,
+                  direction: 'backward',
+                  indexBounds: {
+                    createdAt: [
+                      '[MaxKey, MinKey]'
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        }
+      ]
+    }
+  },
+  executionStats: {
+    nReturned: 418,
+    executionTimeMillis: 57,
+    totalKeysExamined: 103000,
+    totalDocsExamined: 103000,
+    executionStages: {
+      stage: 'SHARD_MERGE_SORT',
+      nReturned: 418,
+      executionTimeMillis: 57,
+      totalKeysExamined: 103000,
+      totalDocsExamined: 103000,
+      totalChildMillis: Long('97'),
+      shards: [
+        {
+          shardName: 'rs-shard1',
+          executionSuccess: true,
+          nReturned: 163,
+          executionTimeMillis: 19,
+          totalKeysExamined: 20000,
+          totalDocsExamined: 20000,
+          executionStages: {
+            isCached: false,
+            stage: 'SUBPLAN',
+            nReturned: 163,
+            executionTimeMillisEstimate: 10,
+            works: 20001,
+            advanced: 163,
+            needTime: 19837,
+            needYield: 0,
+            saveState: 0,
+            restoreState: 0,
+            isEOF: 1,
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              nReturned: 163,
+              executionTimeMillisEstimate: 10,
+              works: 20001,
+              advanced: 163,
+              needTime: 19837,
+              needYield: 0,
+              saveState: 0,
+              restoreState: 0,
+              isEOF: 1,
+              chunkSkips: 0,
+              inputStage: {
+                stage: 'FETCH',
+                filter: {
+                  '$or': [
+                    {
+                      fromWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    },
+                    {
+                      toWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    }
+                  ]
+                },
+                nReturned: 163,
+                executionTimeMillisEstimate: 10,
+                works: 20001,
+                advanced: 163,
+                needTime: 19837,
+                needYield: 0,
+                saveState: 0,
+                restoreState: 0,
+                isEOF: 1,
+                docsExamined: 20000,
+                alreadyHasObj: 0,
+                inputStage: {
+                  stage: 'IXSCAN',
+                  nReturned: 20000,
+                  executionTimeMillisEstimate: 10,
+                  works: 20001,
+                  advanced: 20000,
+                  needTime: 0,
+                  needYield: 0,
+                  saveState: 0,
+                  restoreState: 0,
+                  isEOF: 1,
+                  keyPattern: {
+                    createdAt: 1
+                  },
+                  indexName: 'createdAt_1',
+                  isMultiKey: false,
+                  multiKeyPaths: {
+                    createdAt: []
+                  },
+                  isUnique: false,
+                  isSparse: false,
+                  isPartial: false,
+                  indexVersion: 2,
+                  direction: 'backward',
+                  indexBounds: {
+                    createdAt: [
+                      '[MaxKey, MinKey]'
+                    ]
+                  },
+                  keysExamined: 20000,
+                  seeks: 1,
+                  dupsTested: 0,
+                  dupsDropped: 0
+                }
+              }
+            }
+          }
+        },
+        {
+          shardName: 'rs-shard3',
+          executionSuccess: true,
+          nReturned: 132,
+          executionTimeMillis: 22,
+          totalKeysExamined: 23000,
+          totalDocsExamined: 23000,
+          executionStages: {
+            isCached: false,
+            stage: 'SUBPLAN',
+            nReturned: 132,
+            executionTimeMillisEstimate: 20,
+            works: 23001,
+            advanced: 132,
+            needTime: 22868,
+            needYield: 0,
+            saveState: 1,
+            restoreState: 1,
+            isEOF: 1,
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              nReturned: 132,
+              executionTimeMillisEstimate: 20,
+              works: 23001,
+              advanced: 132,
+              needTime: 22868,
+              needYield: 0,
+              saveState: 1,
+              restoreState: 1,
+              isEOF: 1,
+              chunkSkips: 0,
+              inputStage: {
+                stage: 'FETCH',
+                filter: {
+                  '$or': [
+                    {
+                      fromWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    },
+                    {
+                      toWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    }
+                  ]
+                },
+                nReturned: 132,
+                executionTimeMillisEstimate: 20,
+                works: 23001,
+                advanced: 132,
+                needTime: 22868,
+                needYield: 0,
+                saveState: 1,
+                restoreState: 1,
+                isEOF: 1,
+                docsExamined: 23000,
+                alreadyHasObj: 0,
+                inputStage: {
+                  stage: 'IXSCAN',
+                  nReturned: 23000,
+                  executionTimeMillisEstimate: 0,
+                  works: 23001,
+                  advanced: 23000,
+                  needTime: 0,
+                  needYield: 0,
+                  saveState: 1,
+                  restoreState: 1,
+                  isEOF: 1,
+                  keyPattern: {
+                    createdAt: 1
+                  },
+                  indexName: 'createdAt_1',
+                  isMultiKey: false,
+                  multiKeyPaths: {
+                    createdAt: []
+                  },
+                  isUnique: false,
+                  isSparse: false,
+                  isPartial: false,
+                  indexVersion: 2,
+                  direction: 'backward',
+                  indexBounds: {
+                    createdAt: [
+                      '[MaxKey, MinKey]'
+                    ]
+                  },
+                  keysExamined: 23000,
+                  seeks: 1,
+                  dupsTested: 0,
+                  dupsDropped: 0
+                }
+              }
+            }
+          }
+        },
+        {
+          shardName: 'rs-shard2',
+          executionSuccess: true,
+          nReturned: 123,
+          executionTimeMillis: 56,
+          totalKeysExamined: 60000,
+          totalDocsExamined: 60000,
+          executionStages: {
+            isCached: false,
+            stage: 'SUBPLAN',
+            nReturned: 123,
+            executionTimeMillisEstimate: 55,
+            works: 60001,
+            advanced: 123,
+            needTime: 59877,
+            needYield: 0,
+            saveState: 3,
+            restoreState: 3,
+            isEOF: 1,
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              nReturned: 123,
+              executionTimeMillisEstimate: 55,
+              works: 60001,
+              advanced: 123,
+              needTime: 59877,
+              needYield: 0,
+              saveState: 3,
+              restoreState: 3,
+              isEOF: 1,
+              chunkSkips: 280,
+              inputStage: {
+                stage: 'FETCH',
+                filter: {
+                  '$or': [
+                    {
+                      fromWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    },
+                    {
+                      toWalletId: {
+                        '$eq': 'W000612'
+                      }
+                    }
+                  ]
+                },
+                nReturned: 403,
+                executionTimeMillisEstimate: 50,
+                works: 60001,
+                advanced: 403,
+                needTime: 59597,
+                needYield: 0,
+                saveState: 3,
+                restoreState: 3,
+                isEOF: 1,
+                docsExamined: 60000,
+                alreadyHasObj: 0,
+                inputStage: {
+                  stage: 'IXSCAN',
+                  nReturned: 60000,
+                  executionTimeMillisEstimate: 16,
+                  works: 60001,
+                  advanced: 60000,
+                  needTime: 0,
+                  needYield: 0,
+                  saveState: 3,
+                  restoreState: 3,
+                  isEOF: 1,
+                  keyPattern: {
+                    createdAt: 1
+                  },
+                  indexName: 'createdAt_1',
+                  isMultiKey: false,
+                  multiKeyPaths: {
+                    createdAt: []
+                  },
+                  isUnique: false,
+                  isSparse: false,
+                  isPartial: false,
+                  indexVersion: 2,
+                  direction: 'backward',
+                  indexBounds: {
+                    createdAt: [
+                      '[MaxKey, MinKey]'
+                    ]
+                  },
+                  keysExamined: 60000,
+                  seeks: 1,
+                  dupsTested: 0,
+                  dupsDropped: 0
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  queryShapeHash: 'B30E8C42785BCB2AF3404A4F943E61721385EC25F1BECD60F3E3CC935B0F9EAA',
+  serverInfo: {
+    host: 'e78a269d061a',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  command: {
+    find: 'tx_date',
+    filter: {
+      '$or': [
+        {
+          fromWalletId: 'W000612'
+        },
+        {
+          toWalletId: 'W000612'
+        }
+      ]
+    },
+    sort: {
+      createdAt: -1
+    },
+    lsid: {
+      id: UUID('e4e46cc1-79e6-432b-8a41-6a750ad391c3')
+    },
+    '$clusterTime': {
+      clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+      signature: {
+        hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+        keyId: 0
+      }
+    },
+    '$db': 'fasopay_shard'
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266271, i: 6 })
+}
+
+## une transaction par _id (T0002044)
+{
+  queryPlanner: {
+    winningPlan: {
+      stage: 'SHARD_MERGE',
+      shards: [
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard1',
+          connectionString: 'rs-shard1/fasopay-shard1:27017',
+          serverInfo: {
+            host: '4ced0001e3fa',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            _id: {
+              '$eq': 'T0002044'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: '9B5DE45B',
+          planCacheShapeHash: '9B5DE45B',
+          planCacheKey: 'B4738D99',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'EXPRESS_IXSCAN',
+            keyPattern: '{ _id: 1 }',
+            indexName: '_id_'
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard2',
+          connectionString: 'rs-shard2/fasopay-shard2:27017',
+          serverInfo: {
+            host: '9a61433ca112',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            _id: {
+              '$eq': 'T0002044'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: '9B5DE45B',
+          planCacheShapeHash: '9B5DE45B',
+          planCacheKey: 'B4738D99',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'EXPRESS_IXSCAN',
+            keyPattern: '{ _id: 1 }',
+            indexName: '_id_'
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard3',
+          connectionString: 'rs-shard3/fasopay-shard3:27017',
+          serverInfo: {
+            host: '91bbc888d1f0',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            _id: {
+              '$eq': 'T0002044'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: '9B5DE45B',
+          planCacheShapeHash: '9B5DE45B',
+          planCacheKey: 'B4738D99',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'EXPRESS_IXSCAN',
+            keyPattern: '{ _id: 1 }',
+            indexName: '_id_'
+          },
+          rejectedPlans: []
+        }
+      ]
+    }
+  },
+  executionStats: {
+    nReturned: 1,
+    executionTimeMillis: 1,
+    totalKeysExamined: 1,
+    totalDocsExamined: 1,
+    executionStages: {
+      stage: 'SHARD_MERGE',
+      nReturned: 1,
+      executionTimeMillis: 1,
+      totalKeysExamined: 1,
+      totalDocsExamined: 1,
+      totalChildMillis: Long('0'),
+      shards: [
+        {
+          shardName: 'rs-shard1',
+          executionSuccess: true,
+          nReturned: 0,
+          executionTimeMillis: 0,
+          totalKeysExamined: 0,
+          totalDocsExamined: 0,
+          executionStages: {
+            isCached: false,
+            stage: 'EXPRESS_IXSCAN',
+            keyPattern: '{ _id: 1 }',
+            indexName: '_id_',
+            keysExamined: 0,
+            docsExamined: 0,
+            nReturned: 0
+          }
+        },
+        {
+          shardName: 'rs-shard2',
+          executionSuccess: true,
+          nReturned: 1,
+          executionTimeMillis: 0,
+          totalKeysExamined: 1,
+          totalDocsExamined: 1,
+          executionStages: {
+            isCached: false,
+            stage: 'EXPRESS_IXSCAN',
+            keyPattern: '{ _id: 1 }',
+            indexName: '_id_',
+            keysExamined: 1,
+            docsExamined: 1,
+            nReturned: 1
+          }
+        },
+        {
+          shardName: 'rs-shard3',
+          executionSuccess: true,
+          nReturned: 0,
+          executionTimeMillis: 0,
+          totalKeysExamined: 0,
+          totalDocsExamined: 0,
+          executionStages: {
+            isCached: false,
+            stage: 'EXPRESS_IXSCAN',
+            keyPattern: '{ _id: 1 }',
+            indexName: '_id_',
+            keysExamined: 0,
+            docsExamined: 0,
+            nReturned: 0
+          }
+        }
+      ]
+    }
+  },
+  serverInfo: {
+    host: 'e78a269d061a',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  command: {
+    find: 'tx_date',
+    filter: {
+      _id: 'T0002044'
+    },
+    lsid: {
+      id: UUID('e4e46cc1-79e6-432b-8a41-6a750ad391c3')
+    },
+    '$clusterTime': {
+      clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+      signature: {
+        hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+        keyId: 0
+      }
+    },
+    '$db': 'fasopay_shard'
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266271, i: 6 })
+}
+
+## paiements du marchand M00044 en mars 2026
+{
+  queryPlanner: {
+    winningPlan: {
+      stage: 'SINGLE_SHARD',
+      shards: [
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard1',
+          connectionString: 'rs-shard1/fasopay-shard1:27017',
+          serverInfo: {
+            host: '4ced0001e3fa',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            '$and': [
+              {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              {
+                createdAt: {
+                  '$lt': ISODate('2026-04-01T00:00:00.000Z')
+                }
+              },
+              {
+                createdAt: {
+                  '$gte': ISODate('2026-03-01T00:00:00.000Z')
+                }
+              }
+            ]
+          },
+          indexFilterSet: false,
+          queryHash: 'DB7E8C3A',
+          planCacheShapeHash: 'DB7E8C3A',
+          planCacheKey: '025D3ECB',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              inputStage: {
+                stage: 'IXSCAN',
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'forward',
+                indexBounds: {
+                  createdAt: [
+                    '[new Date(1772323200000), new Date(1775001600000))'
+                  ]
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        }
+      ]
+    }
+  },
+  executionStats: {
+    nReturned: 762,
+    executionTimeMillis: 11,
+    totalKeysExamined: 9816,
+    totalDocsExamined: 9816,
+    executionStages: {
+      stage: 'SINGLE_SHARD',
+      nReturned: 762,
+      executionTimeMillis: 11,
+      totalKeysExamined: 9816,
+      totalDocsExamined: 9816,
+      totalChildMillis: Long('8'),
+      shards: [
+        {
+          shardName: 'rs-shard1',
+          executionSuccess: true,
+          nReturned: 762,
+          executionTimeMillis: 8,
+          totalKeysExamined: 9816,
+          totalDocsExamined: 9816,
+          executionStages: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            nReturned: 762,
+            executionTimeMillisEstimate: 4,
+            works: 9817,
+            advanced: 762,
+            needTime: 9054,
+            needYield: 0,
+            saveState: 0,
+            restoreState: 0,
+            isEOF: 1,
+            chunkSkips: 0,
+            inputStage: {
+              stage: 'FETCH',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              nReturned: 762,
+              executionTimeMillisEstimate: 4,
+              works: 9817,
+              advanced: 762,
+              needTime: 9054,
+              needYield: 0,
+              saveState: 0,
+              restoreState: 0,
+              isEOF: 1,
+              docsExamined: 9816,
+              alreadyHasObj: 0,
+              inputStage: {
+                stage: 'IXSCAN',
+                nReturned: 9816,
+                executionTimeMillisEstimate: 4,
+                works: 9817,
+                advanced: 9816,
+                needTime: 0,
+                needYield: 0,
+                saveState: 0,
+                restoreState: 0,
+                isEOF: 1,
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'forward',
+                indexBounds: {
+                  createdAt: [
+                    '[new Date(1772323200000), new Date(1775001600000))'
+                  ]
+                },
+                keysExamined: 9816,
+                seeks: 1,
+                dupsTested: 0,
+                dupsDropped: 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  queryShapeHash: 'C14C9DA7F1B43BF3872A3FFAFB34E2CA8762706388DA8E15D9E324C7A676388A',
+  serverInfo: {
+    host: 'e78a269d061a',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  command: {
+    find: 'tx_date',
+    filter: {
+      merchantId: 'M00044',
+      createdAt: {
+        '$gte': ISODate('2026-03-01T00:00:00.000Z'),
+        '$lt': ISODate('2026-04-01T00:00:00.000Z')
+      }
+    },
+    lsid: {
+      id: UUID('e4e46cc1-79e6-432b-8a41-6a750ad391c3')
+    },
+    '$clusterTime': {
+      clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+      signature: {
+        hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+        keyId: 0
+      }
+    },
+    '$db': 'fasopay_shard'
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266269, i: 92 })
+}
+
+## toutes les transactions du 30 janvier 2026
+{
+  queryPlanner: {
+    winningPlan: {
+      stage: 'SINGLE_SHARD',
+      shards: [
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard2',
+          connectionString: 'rs-shard2/fasopay-shard2:27017',
+          serverInfo: {
+            host: '9a61433ca112',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            '$and': [
+              {
+                createdAt: {
+                  '$lt': ISODate('2026-01-31T00:00:00.000Z')
+                }
+              },
+              {
+                createdAt: {
+                  '$gte': ISODate('2026-01-30T00:00:00.000Z')
+                }
+              }
+            ]
+          },
+          indexFilterSet: false,
+          queryHash: '7D9AC216',
+          planCacheShapeHash: '7D9AC216',
+          planCacheKey: 'C5EFFD91',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'FETCH',
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              inputStage: {
+                stage: 'IXSCAN',
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'forward',
+                indexBounds: {
+                  createdAt: [
+                    '[new Date(1769731200000), new Date(1769817600000))'
+                  ]
+                }
+              }
+            }
+          },
+          rejectedPlans: []
+        }
+      ]
+    }
+  },
+  executionStats: {
+    nReturned: 599,
+    executionTimeMillis: 1,
+    totalKeysExamined: 599,
+    totalDocsExamined: 599,
+    executionStages: {
+      stage: 'SINGLE_SHARD',
+      nReturned: 599,
+      executionTimeMillis: 1,
+      totalKeysExamined: 599,
+      totalDocsExamined: 599,
+      totalChildMillis: Long('0'),
+      shards: [
+        {
+          shardName: 'rs-shard2',
+          executionSuccess: true,
+          nReturned: 599,
+          executionTimeMillis: 0,
+          totalKeysExamined: 599,
+          totalDocsExamined: 599,
+          executionStages: {
+            isCached: false,
+            stage: 'FETCH',
+            nReturned: 599,
+            executionTimeMillisEstimate: 0,
+            works: 600,
+            advanced: 599,
+            needTime: 0,
+            needYield: 0,
+            saveState: 0,
+            restoreState: 0,
+            isEOF: 1,
+            docsExamined: 599,
+            alreadyHasObj: 0,
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              nReturned: 599,
+              executionTimeMillisEstimate: 0,
+              works: 600,
+              advanced: 599,
+              needTime: 0,
+              needYield: 0,
+              saveState: 0,
+              restoreState: 0,
+              isEOF: 1,
+              chunkSkips: 0,
+              inputStage: {
+                stage: 'IXSCAN',
+                nReturned: 599,
+                executionTimeMillisEstimate: 0,
+                works: 600,
+                advanced: 599,
+                needTime: 0,
+                needYield: 0,
+                saveState: 0,
+                restoreState: 0,
+                isEOF: 1,
+                keyPattern: {
+                  createdAt: 1
+                },
+                indexName: 'createdAt_1',
+                isMultiKey: false,
+                multiKeyPaths: {
+                  createdAt: []
+                },
+                isUnique: false,
+                isSparse: false,
+                isPartial: false,
+                indexVersion: 2,
+                direction: 'forward',
+                indexBounds: {
+                  createdAt: [
+                    '[new Date(1769731200000), new Date(1769817600000))'
+                  ]
+                },
+                keysExamined: 599,
+                seeks: 1,
+                dupsTested: 0,
+                dupsDropped: 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  queryShapeHash: '71632F9FC3F89EA65CB0E3D2AFF663D118F87E643950FA83687333A0B4267386',
+  serverInfo: {
+    host: 'e78a269d061a',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  command: {
+    find: 'tx_date',
+    filter: {
+      createdAt: {
+        '$gte': ISODate('2026-01-30T00:00:00.000Z'),
+        '$lt': ISODate('2026-01-31T00:00:00.000Z')
+      }
+    },
+    lsid: {
+      id: UUID('e4e46cc1-79e6-432b-8a41-6a750ad391c3')
+    },
+    '$clusterTime': {
+      clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+      signature: {
+        hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+        keyId: 0
+      }
+    },
+    '$db': 'fasopay_shard'
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266270, i: 1084 })
+}
+
+## tous les paiements du marchand M00044 (cas du marchand qui fait 25 % du volume)
+{
+  queryPlanner: {
+    winningPlan: {
+      stage: 'SHARD_MERGE',
+      shards: [
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard3',
+          connectionString: 'rs-shard3/fasopay-shard3:27017',
+          serverInfo: {
+            host: '91bbc888d1f0',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            merchantId: {
+              '$eq': 'M00044'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: '4A27D7EE',
+          planCacheShapeHash: '4A27D7EE',
+          planCacheKey: '854714EE',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            inputStage: {
+              stage: 'COLLSCAN',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              direction: 'forward'
+            }
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard1',
+          connectionString: 'rs-shard1/fasopay-shard1:27017',
+          serverInfo: {
+            host: '4ced0001e3fa',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            merchantId: {
+              '$eq': 'M00044'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: '4A27D7EE',
+          planCacheShapeHash: '4A27D7EE',
+          planCacheKey: '854714EE',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            inputStage: {
+              stage: 'COLLSCAN',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              direction: 'forward'
+            }
+          },
+          rejectedPlans: []
+        },
+        {
+          explainVersion: '1',
+          shardName: 'rs-shard2',
+          connectionString: 'rs-shard2/fasopay-shard2:27017',
+          serverInfo: {
+            host: '9a61433ca112',
+            port: 27017,
+            version: '8.0.34',
+            gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+          },
+          namespace: 'fasopay_shard.tx_date',
+          parsedQuery: {
+            merchantId: {
+              '$eq': 'M00044'
+            }
+          },
+          indexFilterSet: false,
+          queryHash: '4A27D7EE',
+          planCacheShapeHash: '4A27D7EE',
+          planCacheKey: '854714EE',
+          optimizationTimeMillis: 0,
+          maxIndexedOrSolutionsReached: false,
+          maxIndexedAndSolutionsReached: false,
+          maxScansToExplodeReached: false,
+          prunedSimilarIndexes: false,
+          winningPlan: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            inputStage: {
+              stage: 'COLLSCAN',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              direction: 'forward'
+            }
+          },
+          rejectedPlans: []
+        }
+      ]
+    }
+  },
+  executionStats: {
+    nReturned: 4708,
+    executionTimeMillis: 24,
+    totalKeysExamined: 0,
+    totalDocsExamined: 103000,
+    executionStages: {
+      stage: 'SHARD_MERGE',
+      nReturned: 4708,
+      executionTimeMillis: 24,
+      totalKeysExamined: 0,
+      totalDocsExamined: 103000,
+      totalChildMillis: Long('44'),
+      shards: [
+        {
+          shardName: 'rs-shard3',
+          executionSuccess: true,
+          nReturned: 1757,
+          executionTimeMillis: 9,
+          totalKeysExamined: 0,
+          totalDocsExamined: 23000,
+          executionStages: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            nReturned: 1757,
+            executionTimeMillisEstimate: 3,
+            works: 23001,
+            advanced: 1757,
+            needTime: 21243,
+            needYield: 0,
+            saveState: 0,
+            restoreState: 0,
+            isEOF: 1,
+            chunkSkips: 0,
+            inputStage: {
+              stage: 'COLLSCAN',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              nReturned: 1757,
+              executionTimeMillisEstimate: 3,
+              works: 23001,
+              advanced: 1757,
+              needTime: 21243,
+              needYield: 0,
+              saveState: 0,
+              restoreState: 0,
+              isEOF: 1,
+              direction: 'forward',
+              docsExamined: 23000
+            }
+          }
+        },
+        {
+          shardName: 'rs-shard1',
+          executionSuccess: true,
+          nReturned: 1555,
+          executionTimeMillis: 12,
+          totalKeysExamined: 0,
+          totalDocsExamined: 20000,
+          executionStages: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            nReturned: 1555,
+            executionTimeMillisEstimate: 9,
+            works: 20001,
+            advanced: 1555,
+            needTime: 18445,
+            needYield: 0,
+            saveState: 0,
+            restoreState: 0,
+            isEOF: 1,
+            chunkSkips: 0,
+            inputStage: {
+              stage: 'COLLSCAN',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              nReturned: 1555,
+              executionTimeMillisEstimate: 9,
+              works: 20001,
+              advanced: 1555,
+              needTime: 18445,
+              needYield: 0,
+              saveState: 0,
+              restoreState: 0,
+              isEOF: 1,
+              direction: 'forward',
+              docsExamined: 20000
+            }
+          }
+        },
+        {
+          shardName: 'rs-shard2',
+          executionSuccess: true,
+          nReturned: 1396,
+          executionTimeMillis: 23,
+          totalKeysExamined: 0,
+          totalDocsExamined: 60000,
+          executionStages: {
+            isCached: false,
+            stage: 'SHARDING_FILTER',
+            nReturned: 1396,
+            executionTimeMillisEstimate: 16,
+            works: 60001,
+            advanced: 1396,
+            needTime: 58604,
+            needYield: 0,
+            saveState: 1,
+            restoreState: 1,
+            isEOF: 1,
+            chunkSkips: 3083,
+            inputStage: {
+              stage: 'COLLSCAN',
+              filter: {
+                merchantId: {
+                  '$eq': 'M00044'
+                }
+              },
+              nReturned: 4479,
+              executionTimeMillisEstimate: 10,
+              works: 60001,
+              advanced: 4479,
+              needTime: 55521,
+              needYield: 0,
+              saveState: 1,
+              restoreState: 1,
+              isEOF: 1,
+              direction: 'forward',
+              docsExamined: 60000
+            }
+          }
+        }
+      ]
+    }
+  },
+  queryShapeHash: '8E227D85C08297239FBF3888CDE48BF7AB2BA7CA4F007017153867CAEA21A7BD',
+  serverInfo: {
+    host: 'e78a269d061a',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  command: {
+    find: 'tx_date',
+    filter: {
+      merchantId: 'M00044'
+    },
+    lsid: {
+      id: UUID('e4e46cc1-79e6-432b-8a41-6a750ad391c3')
+    },
+    '$clusterTime': {
+      clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+      signature: {
+        hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+        keyId: 0
+      }
+    },
+    '$db': 'fasopay_shard'
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266271, i: 6 })
+}
+
+## CA par marchand (agrégation)
+{
+  serverInfo: {
+    host: 'e78a269d061a',
+    port: 27017,
+    version: '8.0.34',
+    gitVersion: '51db4515a6597aedcf6188ee4e48a27e65b065ae'
+  },
+  serverParameters: {
+    internalQueryFacetBufferSizeBytes: 104857600,
+    internalQueryFacetMaxOutputDocSizeBytes: 104857600,
+    internalLookupStageIntermediateDocumentMaxSizeBytes: 104857600,
+    internalDocumentSourceGroupMaxMemoryBytes: 104857600,
+    internalQueryMaxBlockingSortMemoryUsageBytes: 104857600,
+    internalQueryProhibitBlockingMergeOnMongoS: 0,
+    internalQueryMaxAddToSetBytes: 104857600,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 104857600,
+    internalQueryFrameworkControl: 'trySbeRestricted',
+    internalQueryPlannerIgnoreIndexWithCollationForRegex: 1
+  },
+  mergeType: 'mongos',
+  splitPipeline: {
+    shardsPart: [
+      {
+        '$match': {
+          '$and': [
+            {
+              type: {
+                '$eq': 'MERCHANT_PAY'
+              }
+            },
+            {
+              status: {
+                '$eq': 'COMPLETED'
+              }
+            }
+          ]
+        }
+      },
+      {
+        '$group': {
+          _id: '$merchantId',
+          ca: {
+            '$sum': '$amount'
+          }
+        }
+      }
+    ],
+    mergerPart: [
+      {
+        '$mergeCursors': {
+          lsid: {
+            id: UUID('e4e46cc1-79e6-432b-8a41-6a750ad391c3'),
+            uid: Binary.createFromBase64('47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=', 0)
+          },
+          compareWholeSortKey: false,
+          tailableMode: 'normal',
+          nss: 'fasopay_shard.tx_date',
+          allowPartialResults: false,
+          recordRemoteOpWaitTime: false,
+          requestQueryStatsFromRemotes: false
+        }
+      },
+      {
+        '$group': {
+          _id: '$$ROOT._id',
+          ca: {
+            '$sum': '$$ROOT.ca'
+          },
+          '$doingMerge': true
+        }
+      },
+      {
+        '$sort': {
+          sortKey: {
+            ca: -1
+          }
+        }
+      }
+    ]
+  },
+  shards: {
+    'rs-shard3': {
+      host: 'fasopay-shard3:27017',
+      explainVersion: '2',
+      queryPlanner: {
+        namespace: 'fasopay_shard.tx_date',
+        parsedQuery: {
+          '$and': [
+            {
+              status: {
+                '$eq': 'COMPLETED'
+              }
+            },
+            {
+              type: {
+                '$eq': 'MERCHANT_PAY'
+              }
+            }
+          ]
+        },
+        indexFilterSet: false,
+        queryHash: '301EC945',
+        planCacheShapeHash: '301EC945',
+        planCacheKey: '9FE848E1',
+        optimizationTimeMillis: 15,
+        optimizedPipeline: true,
+        maxIndexedOrSolutionsReached: false,
+        maxIndexedAndSolutionsReached: false,
+        maxScansToExplodeReached: false,
+        prunedSimilarIndexes: false,
+        winningPlan: {
+          isCached: false,
+          queryPlan: {
+            stage: 'GROUP',
+            planNodeId: 4,
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              planNodeId: 2,
+              inputStage: {
+                stage: 'COLLSCAN',
+                planNodeId: 1,
+                filter: {
+                  '$and': [
+                    {
+                      status: {
+                        '$eq': 'COMPLETED'
+                      }
+                    },
+                    {
+                      type: {
+                        '$eq': 'MERCHANT_PAY'
+                      }
+                    }
+                  ]
+                },
+                direction: 'forward'
+              }
+            }
+          },
+          slotBasedPlan: {
+            slots: '$$RESULT=s13 env: { s1 = ShardFilterer (shardFilterer) }',
+            stages: '[4] project [s13 = newBsonObj("_id", s10, "ca", s12)] \n' +
+              '[4] project [s12 = doubleDoublePartialSumFinalize(s11)] \n' +
+              '[4] group [s10] [s11 = aggDoubleDoubleSum(s2)] spillSlots[s9] mergingExprs[aggMergeDoubleDoubleSums(s9)] \n' +
+              '[4] project [s10 = (s4 ?: null)] \n' +
+              '[2] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([createdAt = Add(0)], Open), Nothing, false, (s3 ?: null)))} \n' +
+              '[1] filter {(traverseF(s5, lambda(l3.0) { ((move(l3.0) == "COMPLETED") ?: false) }, false) && traverseF(s6, lambda(l4.0) { ((move(l4.0) == "MERCHANT_PAY") ?: false) }, false))} \n' +
+              '[1] scan s7 s8 none none none none none none lowPriority [s2 = amount, s3 = createdAt, s4 = merchantId, s5 = status, s6 = type] @"64f2e997-99c0-4942-be8f-786ad04f85a3" true false '
+          }
+        },
+        rejectedPlans: []
+      },
+      executionStats: {
+        executionSuccess: true,
+        nReturned: 150,
+        executionTimeMillis: 61,
+        totalKeysExamined: 0,
+        totalDocsExamined: 23000,
+        executionStages: {
+          stage: 'project',
+          planNodeId: 4,
+          nReturned: 150,
+          executionTimeMillisEstimate: 20,
+          opens: 1,
+          closes: 1,
+          saveState: 2,
+          restoreState: 2,
+          isEOF: 1,
+          projections: {
+            '13': 'newBsonObj("_id", s10, "ca", s12) '
+          },
+          inputStage: {
+            stage: 'project',
+            planNodeId: 4,
+            nReturned: 150,
+            executionTimeMillisEstimate: 20,
+            opens: 1,
+            closes: 1,
+            saveState: 2,
+            restoreState: 2,
+            isEOF: 1,
+            projections: {
+              '12': 'doubleDoublePartialSumFinalize(s11) '
+            },
+            inputStage: {
+              stage: 'group',
+              planNodeId: 4,
+              nReturned: 150,
+              executionTimeMillisEstimate: 20,
+              opens: 1,
+              closes: 1,
+              saveState: 2,
+              restoreState: 2,
+              isEOF: 1,
+              groupBySlots: [
+                Long('10')
+              ],
+              expressions: {
+                '11': 'aggDoubleDoubleSum(s2) ',
+                initExprs: {
+                  '11': null
+                }
+              },
+              mergingExprs: {
+                '9': 'aggMergeDoubleDoubleSums(s9) '
+              },
+              usedDisk: false,
+              spills: 0,
+              spilledBytes: 0,
+              spilledRecords: 0,
+              spilledDataStorageSize: 0,
+              inputStage: {
+                stage: 'project',
+                planNodeId: 4,
+                nReturned: 6497,
+                executionTimeMillisEstimate: 13,
+                opens: 1,
+                closes: 1,
+                saveState: 2,
+                restoreState: 2,
+                isEOF: 1,
+                projections: {
+                  '10': '(s4 ?: null) '
+                },
+                inputStage: {
+                  stage: 'filter',
+                  planNodeId: 2,
+                  nReturned: 6497,
+                  executionTimeMillisEstimate: 13,
+                  opens: 1,
+                  closes: 1,
+                  saveState: 2,
+                  restoreState: 2,
+                  isEOF: 1,
+                  numTested: 6497,
+                  filter: 'shardFilter(s1, makeBsonObj(MakeObjSpec([createdAt = Add(0)], Open), Nothing, false, (s3 ?: null))) ',
+                  inputStage: {
+                    stage: 'filter',
+                    planNodeId: 1,
+                    nReturned: 6497,
+                    executionTimeMillisEstimate: 10,
+                    opens: 1,
+                    closes: 1,
+                    saveState: 2,
+                    restoreState: 2,
+                    isEOF: 1,
+                    numTested: 23000,
+                    filter: '(traverseF(s5, lambda(l3.0) { ((move(l3.0) == "COMPLETED") ?: false) }, false) && traverseF(s6, lambda(l4.0) { ((move(l4.0) == "MERCHANT_PAY") ?: false) }, false)) ',
+                    inputStage: {
+                      stage: 'scan',
+                      planNodeId: 1,
+                      nReturned: 23000,
+                      executionTimeMillisEstimate: 10,
+                      opens: 1,
+                      closes: 1,
+                      saveState: 2,
+                      restoreState: 2,
+                      isEOF: 1,
+                      numReads: 23000,
+                      recordSlot: 7,
+                      recordIdSlot: 8,
+                      scanFieldNames: [
+                        'amount',
+                        'createdAt',
+                        'merchantId',
+                        'status',
+                        'type'
+                      ],
+                      scanFieldSlots: [
+                        Long('2'),
+                        Long('3'),
+                        Long('4'),
+                        Long('5'),
+                        Long('6')
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    'rs-shard1': {
+      host: 'fasopay-shard1:27017',
+      explainVersion: '2',
+      queryPlanner: {
+        namespace: 'fasopay_shard.tx_date',
+        parsedQuery: {
+          '$and': [
+            {
+              status: {
+                '$eq': 'COMPLETED'
+              }
+            },
+            {
+              type: {
+                '$eq': 'MERCHANT_PAY'
+              }
+            }
+          ]
+        },
+        indexFilterSet: false,
+        queryHash: '301EC945',
+        planCacheShapeHash: '301EC945',
+        planCacheKey: '9FE848E1',
+        optimizationTimeMillis: 18,
+        optimizedPipeline: true,
+        maxIndexedOrSolutionsReached: false,
+        maxIndexedAndSolutionsReached: false,
+        maxScansToExplodeReached: false,
+        prunedSimilarIndexes: false,
+        winningPlan: {
+          isCached: false,
+          queryPlan: {
+            stage: 'GROUP',
+            planNodeId: 4,
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              planNodeId: 2,
+              inputStage: {
+                stage: 'COLLSCAN',
+                planNodeId: 1,
+                filter: {
+                  '$and': [
+                    {
+                      status: {
+                        '$eq': 'COMPLETED'
+                      }
+                    },
+                    {
+                      type: {
+                        '$eq': 'MERCHANT_PAY'
+                      }
+                    }
+                  ]
+                },
+                direction: 'forward'
+              }
+            }
+          },
+          slotBasedPlan: {
+            slots: '$$RESULT=s13 env: { s1 = ShardFilterer (shardFilterer) }',
+            stages: '[4] project [s13 = newBsonObj("_id", s10, "ca", s12)] \n' +
+              '[4] project [s12 = doubleDoublePartialSumFinalize(s11)] \n' +
+              '[4] group [s10] [s11 = aggDoubleDoubleSum(s2)] spillSlots[s9] mergingExprs[aggMergeDoubleDoubleSums(s9)] \n' +
+              '[4] project [s10 = (s4 ?: null)] \n' +
+              '[2] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([createdAt = Add(0)], Open), Nothing, false, (s3 ?: null)))} \n' +
+              '[1] filter {(traverseF(s5, lambda(l3.0) { ((move(l3.0) == "COMPLETED") ?: false) }, false) && traverseF(s6, lambda(l4.0) { ((move(l4.0) == "MERCHANT_PAY") ?: false) }, false))} \n' +
+              '[1] scan s7 s8 none none none none none none lowPriority [s2 = amount, s3 = createdAt, s4 = merchantId, s5 = status, s6 = type] @"64f2e997-99c0-4942-be8f-786ad04f85a3" true false '
+          }
+        },
+        rejectedPlans: []
+      },
+      executionStats: {
+        executionSuccess: true,
+        nReturned: 150,
+        executionTimeMillis: 64,
+        totalKeysExamined: 0,
+        totalDocsExamined: 20000,
+        executionStages: {
+          stage: 'project',
+          planNodeId: 4,
+          nReturned: 150,
+          executionTimeMillisEstimate: 21,
+          opens: 1,
+          closes: 1,
+          saveState: 2,
+          restoreState: 2,
+          isEOF: 1,
+          projections: {
+            '13': 'newBsonObj("_id", s10, "ca", s12) '
+          },
+          inputStage: {
+            stage: 'project',
+            planNodeId: 4,
+            nReturned: 150,
+            executionTimeMillisEstimate: 21,
+            opens: 1,
+            closes: 1,
+            saveState: 2,
+            restoreState: 2,
+            isEOF: 1,
+            projections: {
+              '12': 'doubleDoublePartialSumFinalize(s11) '
+            },
+            inputStage: {
+              stage: 'group',
+              planNodeId: 4,
+              nReturned: 150,
+              executionTimeMillisEstimate: 21,
+              opens: 1,
+              closes: 1,
+              saveState: 2,
+              restoreState: 2,
+              isEOF: 1,
+              groupBySlots: [
+                Long('10')
+              ],
+              expressions: {
+                '11': 'aggDoubleDoubleSum(s2) ',
+                initExprs: {
+                  '11': null
+                }
+              },
+              mergingExprs: {
+                '9': 'aggMergeDoubleDoubleSums(s9) '
+              },
+              usedDisk: false,
+              spills: 0,
+              spilledBytes: 0,
+              spilledRecords: 0,
+              spilledDataStorageSize: 0,
+              inputStage: {
+                stage: 'project',
+                planNodeId: 4,
+                nReturned: 5693,
+                executionTimeMillisEstimate: 21,
+                opens: 1,
+                closes: 1,
+                saveState: 2,
+                restoreState: 2,
+                isEOF: 1,
+                projections: {
+                  '10': '(s4 ?: null) '
+                },
+                inputStage: {
+                  stage: 'filter',
+                  planNodeId: 2,
+                  nReturned: 5693,
+                  executionTimeMillisEstimate: 21,
+                  opens: 1,
+                  closes: 1,
+                  saveState: 2,
+                  restoreState: 2,
+                  isEOF: 1,
+                  numTested: 5693,
+                  filter: 'shardFilter(s1, makeBsonObj(MakeObjSpec([createdAt = Add(0)], Open), Nothing, false, (s3 ?: null))) ',
+                  inputStage: {
+                    stage: 'filter',
+                    planNodeId: 1,
+                    nReturned: 5693,
+                    executionTimeMillisEstimate: 21,
+                    opens: 1,
+                    closes: 1,
+                    saveState: 2,
+                    restoreState: 2,
+                    isEOF: 1,
+                    numTested: 20000,
+                    filter: '(traverseF(s5, lambda(l3.0) { ((move(l3.0) == "COMPLETED") ?: false) }, false) && traverseF(s6, lambda(l4.0) { ((move(l4.0) == "MERCHANT_PAY") ?: false) }, false)) ',
+                    inputStage: {
+                      stage: 'scan',
+                      planNodeId: 1,
+                      nReturned: 20000,
+                      executionTimeMillisEstimate: 21,
+                      opens: 1,
+                      closes: 1,
+                      saveState: 2,
+                      restoreState: 2,
+                      isEOF: 1,
+                      numReads: 20000,
+                      recordSlot: 7,
+                      recordIdSlot: 8,
+                      scanFieldNames: [
+                        'amount',
+                        'createdAt',
+                        'merchantId',
+                        'status',
+                        'type'
+                      ],
+                      scanFieldSlots: [
+                        Long('2'),
+                        Long('3'),
+                        Long('4'),
+                        Long('5'),
+                        Long('6')
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    'rs-shard2': {
+      host: 'fasopay-shard2:27017',
+      explainVersion: '2',
+      queryPlanner: {
+        namespace: 'fasopay_shard.tx_date',
+        parsedQuery: {
+          '$and': [
+            {
+              status: {
+                '$eq': 'COMPLETED'
+              }
+            },
+            {
+              type: {
+                '$eq': 'MERCHANT_PAY'
+              }
+            }
+          ]
+        },
+        indexFilterSet: false,
+        queryHash: '301EC945',
+        planCacheShapeHash: '301EC945',
+        planCacheKey: '9FE848E1',
+        optimizationTimeMillis: 15,
+        optimizedPipeline: true,
+        maxIndexedOrSolutionsReached: false,
+        maxIndexedAndSolutionsReached: false,
+        maxScansToExplodeReached: false,
+        prunedSimilarIndexes: false,
+        winningPlan: {
+          isCached: false,
+          queryPlan: {
+            stage: 'GROUP',
+            planNodeId: 4,
+            inputStage: {
+              stage: 'SHARDING_FILTER',
+              planNodeId: 2,
+              inputStage: {
+                stage: 'COLLSCAN',
+                planNodeId: 1,
+                filter: {
+                  '$and': [
+                    {
+                      status: {
+                        '$eq': 'COMPLETED'
+                      }
+                    },
+                    {
+                      type: {
+                        '$eq': 'MERCHANT_PAY'
+                      }
+                    }
+                  ]
+                },
+                direction: 'forward'
+              }
+            }
+          },
+          slotBasedPlan: {
+            slots: '$$RESULT=s13 env: { s1 = ShardFilterer (shardFilterer) }',
+            stages: '[4] project [s13 = newBsonObj("_id", s10, "ca", s12)] \n' +
+              '[4] project [s12 = doubleDoublePartialSumFinalize(s11)] \n' +
+              '[4] group [s10] [s11 = aggDoubleDoubleSum(s2)] spillSlots[s9] mergingExprs[aggMergeDoubleDoubleSums(s9)] \n' +
+              '[4] project [s10 = (s4 ?: null)] \n' +
+              '[2] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([createdAt = Add(0)], Open), Nothing, false, (s3 ?: null)))} \n' +
+              '[1] filter {(traverseF(s5, lambda(l3.0) { ((move(l3.0) == "COMPLETED") ?: false) }, false) && traverseF(s6, lambda(l4.0) { ((move(l4.0) == "MERCHANT_PAY") ?: false) }, false))} \n' +
+              '[1] scan s7 s8 none none none none none none lowPriority [s2 = amount, s3 = createdAt, s4 = merchantId, s5 = status, s6 = type] @"64f2e997-99c0-4942-be8f-786ad04f85a3" true false '
+          }
+        },
+        rejectedPlans: []
+      },
+      executionStats: {
+        executionSuccess: true,
+        nReturned: 150,
+        executionTimeMillis: 96,
+        totalKeysExamined: 0,
+        totalDocsExamined: 60000,
+        executionStages: {
+          stage: 'project',
+          planNodeId: 4,
+          nReturned: 150,
+          executionTimeMillisEstimate: 60,
+          opens: 1,
+          closes: 1,
+          saveState: 4,
+          restoreState: 4,
+          isEOF: 1,
+          projections: {
+            '13': 'newBsonObj("_id", s10, "ca", s12) '
+          },
+          inputStage: {
+            stage: 'project',
+            planNodeId: 4,
+            nReturned: 150,
+            executionTimeMillisEstimate: 60,
+            opens: 1,
+            closes: 1,
+            saveState: 4,
+            restoreState: 4,
+            isEOF: 1,
+            projections: {
+              '12': 'doubleDoublePartialSumFinalize(s11) '
+            },
+            inputStage: {
+              stage: 'group',
+              planNodeId: 4,
+              nReturned: 150,
+              executionTimeMillisEstimate: 60,
+              opens: 1,
+              closes: 1,
+              saveState: 4,
+              restoreState: 4,
+              isEOF: 1,
+              groupBySlots: [
+                Long('10')
+              ],
+              expressions: {
+                '11': 'aggDoubleDoubleSum(s2) ',
+                initExprs: {
+                  '11': null
+                }
+              },
+              mergingExprs: {
+                '9': 'aggMergeDoubleDoubleSums(s9) '
+              },
+              usedDisk: false,
+              spills: 0,
+              spilledBytes: 0,
+              spilledRecords: 0,
+              spilledDataStorageSize: 0,
+              inputStage: {
+                stage: 'project',
+                planNodeId: 4,
+                nReturned: 5247,
+                executionTimeMillisEstimate: 60,
+                opens: 1,
+                closes: 1,
+                saveState: 4,
+                restoreState: 4,
+                isEOF: 1,
+                projections: {
+                  '10': '(s4 ?: null) '
+                },
+                inputStage: {
+                  stage: 'filter',
+                  planNodeId: 2,
+                  nReturned: 5247,
+                  executionTimeMillisEstimate: 60,
+                  opens: 1,
+                  closes: 1,
+                  saveState: 4,
+                  restoreState: 4,
+                  isEOF: 1,
+                  numTested: 16603,
+                  filter: 'shardFilter(s1, makeBsonObj(MakeObjSpec([createdAt = Add(0)], Open), Nothing, false, (s3 ?: null))) ',
+                  inputStage: {
+                    stage: 'filter',
+                    planNodeId: 1,
+                    nReturned: 16603,
+                    executionTimeMillisEstimate: 43,
+                    opens: 1,
+                    closes: 1,
+                    saveState: 4,
+                    restoreState: 4,
+                    isEOF: 1,
+                    numTested: 60000,
+                    filter: '(traverseF(s5, lambda(l3.0) { ((move(l3.0) == "COMPLETED") ?: false) }, false) && traverseF(s6, lambda(l4.0) { ((move(l4.0) == "MERCHANT_PAY") ?: false) }, false)) ',
+                    inputStage: {
+                      stage: 'scan',
+                      planNodeId: 1,
+                      nReturned: 60000,
+                      executionTimeMillisEstimate: 26,
+                      opens: 1,
+                      closes: 1,
+                      saveState: 4,
+                      restoreState: 4,
+                      isEOF: 1,
+                      numReads: 60000,
+                      recordSlot: 7,
+                      recordIdSlot: 8,
+                      scanFieldNames: [
+                        'amount',
+                        'createdAt',
+                        'merchantId',
+                        'status',
+                        'type'
+                      ],
+                      scanFieldSlots: [
+                        Long('2'),
+                        Long('3'),
+                        Long('4'),
+                        Long('5'),
+                        Long('6')
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  queryShapeHash: 'E24F8A59B804A23F38EA321FCFB9077D5D8F154E63A8055E0824FD013FCDAB37',
+  command: {
+    aggregate: 'tx_date',
+    pipeline: [
+      {
+        '$match': {
+          type: 'MERCHANT_PAY',
+          status: 'COMPLETED'
+        }
+      },
+      {
+        '$group': {
+          _id: '$merchantId',
+          ca: {
+            '$sum': '$amount'
+          }
+        }
+      },
+      {
+        '$sort': {
+          ca: -1
+        }
+      }
+    ],
+    cursor: {}
+  },
+  ok: 1,
+  '$clusterTime': {
+    clusterTime: Timestamp({ t: 1794266271, i: 6 }),
+    signature: {
+      hash: Binary.createFromBase64('AAAAAAAAAAAAAAAAAAAAAAAAAAA=', 0),
+      keyId: Long('0')
+    }
+  },
+  operationTime: Timestamp({ t: 1794266271, i: 6 })
+}
