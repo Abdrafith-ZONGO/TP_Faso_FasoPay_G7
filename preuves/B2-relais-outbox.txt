@@ -1,0 +1,74 @@
+
+=== Bonus B2 : préparation de la base fasopay_b2 ===
+Commande : mongosh fasopay_b2 --quiet --eval "load('/tmp/code/transfer.js'); load('/tmp/code/B2-outils.js'); preparer()"
+Date : Tue Nov 10 00:59:26 UTC 2026
+base fasopay_b2 prête : 20 wallets de 1 000 000 FCFA, collections : ledger_entries, notifications, outbox, relais_etat, transactions, wallets
+
+=== Bonus B2, scénario 1 : kill -9 du relais au milieu d'une rafale de 1 000 virements ===
+Date : Tue Nov 10 00:59:27 UTC 2026
+Commande : mongosh fasopay_b2 --quiet --file /tmp/code/B2-relais.js > /tmp/b2/relais-1.log &   (relais n° 1, en arrière-plan)
+Commande : mongosh fasopay_b2 --quiet --eval "load('/tmp/code/transfer.js'); load('/tmp/code/B2-outils.js'); rafale('A', 1000)" &   (rafale en arrière-plan)
+juste avant kill -9 : transactions 324, outbox PENDING 3, outbox SENT 322, notifications 322
+Commande : kill -9 152   (pid du relais n° 1)
+Date du kill -9 : Tue Nov 10 00:59:34 UTC 2026
+relais mort depuis 3 s, la rafale continue : transactions 734, outbox PENDING 410, outbox SENT 324, notifications 324
+Commande : mongosh fasopay_b2 --quiet --file /tmp/code/B2-relais.js > /tmp/b2/relais-2.log &   (relais n° 2 : reprise avec resumeAfter)
+--- sortie de la rafale ---
+rafale A : 1000 virements faits, 0 autres réponses, en 8.5 s
+--- journal du relais n° 1 (tué par kill -9) ---
+2026-11-10T00:59:28.652Z relais démarré (pid 152) : premier démarrage, aucun jeton
+2026-11-10T00:59:29.660Z relais prêt
+2026-11-10T00:59:32.867Z 100 événements traités depuis le démarrage (relivraisons reconnues : 0)
+2026-11-10T00:59:33.764Z 200 événements traités depuis le démarrage (relivraisons reconnues : 0)
+2026-11-10T00:59:34.577Z 300 événements traités depuis le démarrage (relivraisons reconnues : 0)
+--- journal du relais n° 2 (reprise) ---
+2026-11-10T00:59:38.609Z relais démarré (pid 232) : reprise avec resumeAfter, après 323 événements traités
+2026-11-10T00:59:38.609Z relais prêt
+2026-11-10T00:59:38.618Z événement T6af26c76e8e5fec0cfc1987c déjà notifié : relivraison reconnue, aucune notification en double
+2026-11-10T00:59:39.485Z 100 événements traités depuis le démarrage (relivraisons reconnues : 1)
+2026-11-10T00:59:40.332Z 200 événements traités depuis le démarrage (relivraisons reconnues : 1)
+2026-11-10T00:59:41.059Z 300 événements traités depuis le démarrage (relivraisons reconnues : 1)
+2026-11-10T00:59:41.751Z 400 événements traités depuis le démarrage (relivraisons reconnues : 1)
+2026-11-10T00:59:42.497Z 500 événements traités depuis le démarrage (relivraisons reconnues : 1)
+2026-11-10T00:59:43.345Z 600 événements traités depuis le démarrage (relivraisons reconnues : 1)
+
+=== Bonus B2, scénario 1 : vérifications ===
+Commande : mongosh fasopay_b2 --quiet --eval "load('/tmp/code/transfer.js'); load('/tmp/code/B2-outils.js'); verifier()"
+Date : Tue Nov 10 00:59:44 UTC 2026
+transactions : 1000, événements outbox : 1000, notifications : 1000, traités selon le jeton : 1000
+OK     un événement outbox par virement (1000 pour 1000)
+OK     aucun événement resté PENDING (0)
+OK     0 événement perdu : chaque événement a sa notification (0 sans notification)
+OK     0 notification en double pour une même transaction (0)
+OK     aucune notification sans événement (0)
+OK     autant de notifications que d'événements (1000 pour 1000)
+RÉSULTAT : 6 vérifications OK, 0 en échec
+
+=== Bonus B2, scénario 2 : arrêt brutal juste après la 5e notification, avant SENT et avant le jeton ===
+Date : Tue Nov 10 00:59:45 UTC 2026
+Commande : CRASH_APRES=5 mongosh fasopay_b2 --quiet --file /tmp/code/B2-relais.js > /tmp/b2/relais-3.log &   (relais n° 3)
+Commande : mongosh fasopay_b2 --quiet --eval "load('/tmp/code/transfer.js'); load('/tmp/code/B2-outils.js'); rafale('B', 20)"
+rafale B : 20 virements faits, 0 autres réponses, en 0.2 s
+code de sortie du relais n° 3 : 9
+après l arrêt brutal du relais n° 3 : transactions 1020, outbox PENDING 16, outbox SENT 1004, notifications 1005
+Commande : mongosh fasopay_b2 --quiet --file /tmp/code/B2-relais.js > /tmp/b2/relais-4.log &   (relais n° 4 : reprise avec resumeAfter)
+--- journal du relais n° 3 (arrêt brutal simulé) ---
+2026-11-10T00:59:45.630Z relais démarré (pid 350) : reprise avec resumeAfter, après 1000 événements traités
+2026-11-10T00:59:45.630Z relais prêt
+2026-11-10T00:59:49.834Z ARRÊT BRUTAL SIMULÉ après la notification de T6af26c85f82234f6c4dfb617, avant SENT et avant le jeton
+--- journal du relais n° 4 (reprise) ---
+2026-11-10T00:59:50.633Z relais démarré (pid 405) : reprise avec resumeAfter, après 1004 événements traités
+2026-11-10T00:59:50.633Z relais prêt
+2026-11-10T00:59:50.638Z événement T6af26c85f82234f6c4dfb617 déjà notifié : relivraison reconnue, aucune notification en double
+
+=== Bonus B2, scénario 2 : vérifications (sur les 1 020 virements des deux scénarios) ===
+Commande : mongosh fasopay_b2 --quiet --eval "load('/tmp/code/transfer.js'); load('/tmp/code/B2-outils.js'); verifier()"
+Date : Tue Nov 10 00:59:51 UTC 2026
+transactions : 1020, événements outbox : 1020, notifications : 1020, traités selon le jeton : 1020
+OK     un événement outbox par virement (1020 pour 1020)
+OK     aucun événement resté PENDING (0)
+OK     0 événement perdu : chaque événement a sa notification (0 sans notification)
+OK     0 notification en double pour une même transaction (0)
+OK     aucune notification sans événement (0)
+OK     autant de notifications que d'événements (1020 pour 1020)
+RÉSULTAT : 6 vérifications OK, 0 en échec

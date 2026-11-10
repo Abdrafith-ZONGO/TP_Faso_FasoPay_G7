@@ -1,0 +1,81 @@
+
+=== Partie 7 : le serveur exige l'authentification (options de démarrage, lues par l'administrateur) ===
+Commande : mongosh --quiet -u admin-test -p test-admin-2026 --authenticationDatabase admin --eval "print(JSON.stringify(db.adminCommand({ getCmdLineOpts: 1 }).parsed.security))"
+Date : Tue Nov 10 00:28:25 UTC 2026
+{"authorization":"enabled"}
+
+=== Partie 7 : création des rôles minimaux et des utilisateurs (par l'administrateur) ===
+Commande : mongosh --quiet -u admin-test -p test-admin-2026 --authenticationDatabase admin --eval "load('/tmp/code/07-securite.js'); preparer()"
+Date : Tue Nov 10 00:28:26 UTC 2026
+rôles créés : [
+ {
+  "role": "fasopay_application",
+  "droits": [
+   "transactions : find, insert, update",
+   "ledger_entries : find, insert",
+   "wallets : find, update",
+   "outbox : insert"
+  ]
+ },
+ {
+  "role": "fasopay_relais",
+  "droits": [
+   "outbox : changeStream, find, update",
+   "notifications : find, insert"
+  ]
+ },
+ {
+  "role": "fasopay_tableau",
+  "droits": [
+   "ca_marchands : find"
+  ]
+ }
+]
+utilisateurs créés : ["app_fasopay -> fasopay_application","relais_fasopay -> fasopay_relais","tableau_fasopay -> fasopay_tableau"]
+
+=== Partie 7 : chaque utilisateur essaie ce qu'il doit pouvoir faire, et ce qu'il ne doit pas pouvoir faire ===
+Commande : mongosh --quiet -u admin-test -p test-admin-2026 --authenticationDatabase admin --eval "load('/tmp/code/07-securite.js'); tester()"
+Date : Tue Nov 10 00:28:26 UTC 2026
+sans authentification, lire transactions : Unauthorized (code 13)
+OK     une connexion sans identifiants ne lit rien
+
+--- utilisateur app_fasopay (rôle fasopay_application) ---
+insérer une transaction : autorisé
+OK     app_fasopay peut insérer une transaction
+ajouter une ligne de ledger : autorisé
+OK     app_fasopay peut ajouter une ligne de ledger
+mettre à jour un solde : autorisé
+OK     app_fasopay peut mettre à jour un solde
+ajouter un événement outbox : autorisé
+OK     app_fasopay peut ajouter un événement outbox
+MODIFIER une ligne de ledger : Unauthorized (code 13)
+OK     app_fasopay ne peut pas MODIFIER une ligne de ledger
+SUPPRIMER une ligne de ledger : Unauthorized (code 13)
+OK     app_fasopay ne peut pas SUPPRIMER une ligne de ledger
+supprimer la collection ledger_entries : Unauthorized (code 13)
+OK     app_fasopay ne peut pas supprimer la collection ledger_entries
+supprimer un wallet : Unauthorized (code 13)
+OK     app_fasopay ne peut pas supprimer un wallet
+lire le read model du tableau de bord : Unauthorized (code 13)
+OK     app_fasopay ne peut pas lire le read model du tableau de bord
+
+--- utilisateur relais_fasopay (rôle fasopay_relais) ---
+marquer un événement outbox comme envoyé : autorisé
+OK     relais_fasopay peut marquer un événement outbox comme envoyé
+écrire une notification : autorisé
+OK     relais_fasopay peut écrire une notification
+modifier un solde : Unauthorized (code 13)
+OK     relais_fasopay ne peut pas modifier un solde
+lire le ledger : Unauthorized (code 13)
+OK     relais_fasopay ne peut pas lire le ledger
+
+--- utilisateur tableau_fasopay (rôle fasopay_tableau) ---
+lire le read model (ca_marchands) : autorisé
+OK     tableau_fasopay peut lire le read model (ca_marchands)
+lire les transactions : Unauthorized (code 13)
+OK     tableau_fasopay ne peut pas lire les transactions
+écrire dans le read model : Unauthorized (code 13)
+OK     tableau_fasopay ne peut pas écrire dans le read model
+
+OK     la ligne de ledger L1 est intacte après les tentatives (montant 1000)
+RÉSULTAT : 18 vérifications OK, 0 en échec

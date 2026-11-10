@@ -1005,3 +1005,60 @@ docker cp fasopay-mongos:/tmp/preuves/06-cle-cible.txt preuves/06-cle-cible.txt
 
 Résultat : 60 000 transactions écrites ; 0 document sans `walletCle` ; répartition 32,2 %, 32,6 % et 35,2 % sans aucune correction ; trafic du jour 31,6 %, 34,3 % et 34,1 % ; l'historique d'un wallet par `walletCle` est ciblé sur un seul shard (`SINGLE_SHARD`, 409 documents examinés pour 409 rendus). Preuve : `preuves/06-cle-cible.txt` (date `Mon Nov  9 23:44:47 UTC 2026`).
 
+## 20. Sécurité : rôles minimaux (Partie 7)
+
+Objectif : prouver le principe du moindre privilège au lieu de seulement le décrire. Un serveur de test est démarré avec authentification obligatoire ; trois rôles minimaux et trois utilisateurs y sont créés (`code/07-securite.js`), puis chaque utilisateur essaie ce qu'il doit pouvoir faire et ce qu'il ne doit pas pouvoir faire. Les identifiants sont des valeurs de test, propres à ce conteneur jetable ; en production, ils viendraient d'un coffre de secrets.
+
+Démarrage du serveur de test (les deux variables créent le compte administrateur ; avec elles, l'image démarre `mongod` en mode authentification obligatoire), copie du code, preuve et récupération :
+
+```powershell
+docker run -d --name fasopay-securite -e MONGO_INITDB_ROOT_USERNAME=admin-test -e MONGO_INITDB_ROOT_PASSWORD=test-admin-2026 mongo:8.0 --wiredTigerCacheSizeGB 0.25
+docker cp code/. fasopay-securite:/tmp/code/
+docker exec fasopay-securite sh /tmp/code/07-lancer.sh securite
+docker cp fasopay-securite:/tmp/preuves/07-securite.txt preuves/07-securite.txt
+```
+
+| Rôle | Droits | Utilisateur |
+|---|---|---|
+| `fasopay_application` | `transactions` : find, insert, update ; `ledger_entries` : find, insert (ajout seul) ; `wallets` : find, update ; `outbox` : insert | `app_fasopay` |
+| `fasopay_relais` | `outbox` : find, update, changeStream ; `notifications` : find, insert | `relais_fasopay` |
+| `fasopay_tableau` | `ca_marchands` (read model) : find | `tableau_fasopay` |
+
+Note : un premier lancement s'était arrêté sur l'affichage de la liste des rôles (`TypeError: b.getRoles(...).map is not a function` : dans mongosh 2.14.0, `getRoles` ne renvoie pas un simple tableau), après la création des rôles et des utilisateurs. Le script a été corrigé (affichage et remise à zéro des utilisateurs et rôles de la base de test au début), puis toute la preuve a été refaite ; seule la seconde exécution est conservée.
+
+Résultat : `authorization: enabled` ; une connexion sans identifiants ne lit rien (`Unauthorized`, code 13) ; `app_fasopay` peut insérer une transaction, ajouter une ligne de ledger, mettre à jour un solde et ajouter un événement outbox, mais il est refusé (code 13) quand il essaie de modifier ou supprimer une ligne de ledger, de supprimer la collection `ledger_entries`, de supprimer un wallet ou de lire le read model ; `relais_fasopay` et `tableau_fasopay` n'ont accès qu'à leur périmètre. La ligne de ledger visée reste intacte. 18 vérifications OK sur 18. Preuve : `preuves/07-securite.txt` (date `Tue Nov 10 00:28:25 UTC 2026`).
+
+
+## 21. Diagramme d'architecture (Partie 7)
+
+Objectif : produire le diagramme unique de la cible PME à partir d'une source texte, pour qu'il puisse être relu, corrigé et régénéré. La source est `rapport/diagramme-architecture.puml` (PlantUML) ; l'image est `rapport/diagramme-architecture.png`. Deux façons de produire l'image, au choix :
+
+1. **Dans VS Code** (ce que nous avons fait) : avec l'extension « PlantUML » (jebbs), ouvrir `rapport/diagramme-architecture.puml`, afficher l'aperçu avec `Alt+D`, puis `Ctrl+Shift+P` → `PlantUML: Export Current Diagram` → `png`. L'image exportée remplace `rapport/diagramme-architecture.png`.
+2. **Sans rien installer, avec Docker** : PlantUML tourne dans un conteneur.
+
+```powershell
+docker run --rm -v "${PWD}/rapport:/data" plantuml/plantuml -charset UTF-8 -tpng /data/diagramme-architecture.puml
+```
+
+Le diagramme ne montre que les composants retenus en Partie 7 : 2 serveurs d'application (API `transfer()`, relais outbox, tâches de nuit `$merge` et rapprochement), le Replica Set `rs-fasopay` de 3 nœuds, le read model lu sur un secondary, les notifications et les sauvegardes. Ni Kafka, ni Spark, ni Redis, ni shard.
+
+## 22. Bonus B2 : relais Outbox par Change Stream
+
+Objectif : prouver qu'un relais qui lit `outbox` par Change Stream ne perd aucun événement et n'envoie aucune notification en double, même tué par `kill -9`. Tout se passe dans une base à part, `fasopay_b2`, sur `mongo-rs1` (Replica Set `rs0` à un nœud : un Change Stream exige un Replica Set) ; `fasopay_tp` n'est pas touchée. Les virements passent par notre `transfer()` (Partie 4), qui écrit l'événement `outbox` dans la même transaction que le virement.
+
+Fichiers : `code/B2-relais.js` (le relais), `code/B2-outils.js` (préparation, rafale de virements, vérifications), `code/B2-lancer.sh` (les deux scénarios, dans l'ordre, avec la preuve).
+
+```powershell
+docker start mongo-rs1
+docker cp code/. mongo-rs1:/tmp/code/
+docker exec mongo-rs1 sh /tmp/code/B2-lancer.sh relais
+docker cp mongo-rs1:/tmp/preuves/B2-relais-outbox.txt preuves/B2-relais-outbox.txt
+```
+
+Le relais, pour chaque événement, dans cet ordre : (1) il écrit la notification avec le même `_id` que l'événement (`updateOne` avec `upsert` et `$setOnInsert`) ; (2) il passe l'événement à `SENT` ; (3) il sauvegarde le jeton de reprise dans `relais_etat`. Le filtre `{ operationType: "insert", "fullDocument.status": "PENDING" }` est appliqué par le serveur. Au premier démarrage, le relais sauvegarde tout de suite un jeton, pour ne rien perdre s'il meurt avant son premier événement.
+
+Résultat :
+- **Scénario 1** (`kill -9` au milieu de 1 000 virements) : le relais n° 1 est tué à 00:59:34 ; pendant les 3 s qui suivent, la rafale continue et 410 événements s'accumulent en `PENDING`. Le relais n° 2 reprend avec `resumeAfter` « après 323 événements traités » et reconnaît **1 relivraison** : l'événement 324 avait déjà sa notification et son `SENT`, mais le `kill -9` est tombé avant la sauvegarde du jeton. Vérifications : 1 000 événements, 1 000 notifications, 0 perdu, 0 doublon (6 OK sur 6).
+- **Scénario 2** (arrêt volontaire juste après la 5e notification, avant `SENT` et avant le jeton) : le relais n° 3 sort avec le code 9 ; à cet instant, 1 005 notifications pour 1 004 événements `SENT`. Le relais n° 4 reprend et reconnaît **1 relivraison** du même événement, sans doublon. Vérifications sur les 1 020 virements : 1 020 événements, 1 020 notifications, 0 perdu, 0 doublon (6 OK sur 6).
+
+Preuve : `preuves/B2-relais-outbox.txt` (date `Tue Nov 10 00:59:26 UTC 2026`).

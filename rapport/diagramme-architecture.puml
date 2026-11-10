@@ -1,0 +1,67 @@
+@startuml diagramme-architecture
+' FasoPay, groupe 07 : architecture cible PME (Partie 7)
+' Un Replica Set de 3 nœuds et un read model. Ni Kafka, ni Spark, ni Redis, ni sharding.
+' Image : dans VS Code (extension PlantUML), Alt+D puis « PlantUML: Export Current Diagram » en png ;
+' ou sans rien installer : docker run --rm -v "${PWD}/rapport:/data" plantuml/plantuml -charset UTF-8 -tpng /data/diagramme-architecture.puml
+
+skinparam dpi 150
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 60
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 13
+skinparam defaultTextAlignment center
+skinparam roundCorner 14
+skinparam ArrowColor #4A5568
+skinparam ArrowThickness 1.4
+skinparam ArrowFontSize 11
+skinparam ArrowFontColor #4A5568
+skinparam titleFontSize 20
+
+skinparam rectangle {
+  BorderColor #A0AEC0
+  FontColor #1A202C
+}
+skinparam database {
+  BackgroundColor #EBF4FF
+  BorderColor #3182CE
+}
+skinparam actor {
+  BackgroundColor #EDF2F7
+  BorderColor #4A5568
+}
+
+title FasoPay · architecture cible PME
+
+actor "Clients" as clients
+rectangle "Répartiteur de charge" as lb #EDF2F7
+
+rectangle "**Serveurs d'application** (2)" as app #F0FFF4 {
+  rectangle "**API FasoPay**\ntransfer()\nclé d'idempotence" as api #FFFFFF
+  rectangle "**Relais outbox**\nChange Stream" as relais #FFFFFF
+  rectangle "**Tâches de nuit**\n$merge, rapprochement" as taches #FFFFFF
+}
+
+rectangle "**Replica Set rs-fasopay** · 3 nœuds de 64 Go · majorité 2 sur 3" as rs #F7FAFC {
+  database "**SECONDARY**\nnœud 2" as n2
+  database "**PRIMARY**\nnœud 1" as n1
+  database "**SECONDARY**\nnœud 3\nread model" as n3
+}
+
+rectangle "**Sauvegardes**\nStorage Box" as save #FFFAF0
+rectangle "**Notifications**\nSMS, push" as notif #FFFAF0
+rectangle "**Tableau de bord**\nrèglements, alertes" as tableau #FFFAF0
+
+clients -down-> lb : HTTPS
+lb -down-> api
+api -down-> n1 : w: majority
+n1 -up-> relais
+taches -down-> n1
+n1 -left-> n2
+n1 -right-> n3
+relais -up-> notif
+n2 -down-> save : chaque jour
+tableau -up-> n3 : lecture
+
+@enduml
