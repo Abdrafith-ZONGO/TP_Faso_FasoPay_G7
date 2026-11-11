@@ -685,9 +685,11 @@ docker cp mongo-rs1:/tmp/preuves/04-lost-update.txt preuves/04-lost-update.txt
 ```
 
 Résultat :
-- `tests` (`04-base-test.js` puis `04-tests.js`) : 36 vérifications OK, 0 en échec (chargement sans effet, virement réussi, 1 appel et 3 rejeux, 10 refus, abort prouvé, réponse perdue, documents valides, argent conservé). Preuve : `preuves/04-transaction.txt` (date `Mon Nov  9 19:49:21 UTC 2026`).
-- `concurrence` (`04-concurrence.js`) : 10 vérifications OK, 0 en échec : 30 virements acceptés sur 50 (19 pour le client A, 11 pour le client B), solde final 0, monnaie conservée, 60 lignes de ledger, 30 outbox, 6 conflits rejoués ; la même clé envoyée par les deux clients ne produit qu'un virement. Preuve : `preuves/04-concurrence.txt` (date `Mon Nov  9 19:51:44 UTC 2026`).
+- `tests` (`04-base-test.js` puis `04-tests.js`) : 36 vérifications OK, 0 en échec (chargement sans effet, virement réussi, 1 appel et 3 rejeux, 10 refus, abort prouvé, réponse perdue, documents valides, argent conservé). Preuve : `preuves/04-transaction.txt` (date `Wed Nov 11 20:48:31 UTC 2026`).
+- `concurrence` (`04-concurrence.js`) : 10 vérifications OK, 0 en échec : 30 virements acceptés sur 50 (17 pour le client A, 13 pour le client B), solde final 0, monnaie conservée, 60 lignes de ledger, 30 outbox, 9 conflits rejoués ; la même clé envoyée par les deux clients ne produit qu'un virement. Preuve : `preuves/04-concurrence.txt` (date `Wed Nov 11 20:48:56 UTC 2026`).
 - `lostupdate` (`04-lost-update.js`) : la version naïve sans transaction accepte 50 débits de 100 FCFA (5000 promis) alors que seuls 2500 FCFA sont retirés du wallet. Preuve : `preuves/04-lost-update.txt` (date `Mon Nov  9 19:53:08 UTC 2026`).
+
+Relance du 11 novembre 2026 : lors d'une relecture, un essai avec 8 clients simultanés sur le même wallet (hors preuves) a montré que `transfer()` pouvait épuiser ses 10 essais et lever l'erreur de conflit au lieu de répondre. Nous avons porté la limite à 60 essais, avec une attente qui grandit à chaque essai (`code/transfer.js`), recopié le code dans le conteneur (`docker cp code/. mongo-rs1:/tmp/code/`), puis refait les preuves `tests` et `concurrence` ci-dessus avec cette version. Les autres preuves qui utilisent `transfer()` (`04-debit.txt`, `04-transaction-rs3.txt`, `04-concurrence-rs3.txt`, `B2-relais-outbox.txt`) datent de la version précédente, dont seules cette limite et cette attente diffèrent.
 
 La base `fasopay_tp` n'est pas touchée par ces tests ; `fasopay_test` reste en place et peut être recréée à tout moment par `04-base-test.js`.
 

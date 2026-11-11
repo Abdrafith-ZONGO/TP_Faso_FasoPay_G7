@@ -12,7 +12,7 @@ Nous déclarons la cible **PME**. Ce sont nos chiffres de la Partie 0 qui la fix
 | Working set | 25,9 Go, soit 40 % de 64 Go (54 % dans l'hypothèse prudente) | **Enterprise** : il tient dans le cache d'un seul nœud de 64 Go (31,5 Go de cache). |
 | Volume | 224,4 Go de données par an, 307,9 Go avec les index | **Enterprise** : loin de la zone de 1 à 2 To par Replica Set ; 1 To non compressé n'est atteint qu'en 3,2 ans. |
 | Débit au pic | 1 200 tx/s, soit 7 200 écritures de documents/s | Un seul primary peut suffire, **à condition** de le vérifier par un test de charge (330 virements/s mesurés sur notre portable, 2 400 nécessaires : annexe A, section 2 ter). |
-| Seuil de sharding | entre 490 et 600 M tx/an sur des nœuds de 64 Go | **Enterprise** : nous sommes à 400 M tx/an ; le sharding n'est pas nécessaire à 18 mois (Partie 6). |
+| Seuil de sharding | 490 M tx/an sur des nœuds de 64 Go | **Enterprise** : nous sommes à 400 M tx/an ; le sharding n'est pas nécessaire à 18 mois (Partie 6). |
 
 Le tableau de bord et les règlements marchands ont besoin d'agrégats (chiffre d'affaires par marchand) qui ne doivent pas peser sur le primary : c'est le **read model**, la deuxième moitié de la cible PME.
 
@@ -39,18 +39,18 @@ Ce diagramme ne contient que les composants de la cible : ni Kafka, ni Spark, ni
 | **Alertes plafond vers `fraud_alerts`** | E2 trouve **5 wallets** qui découpent leurs transferts sous le plafond journalier. | `02-enquete.txt` |
 | **Sauvegardes hors des nœuds** (Storage Box, restauration à un instant donné) | Le Replica Set protège contre la panne d'un nœud, pas contre une erreur humaine : une suppression faite sur le primary est répliquée sur les secondaries en quelques millisecondes. Il faut une copie quotidienne et l'oplog pour revenir à l'instant qui précède l'erreur. | Partie 5 |
 | **2 serveurs d'application derrière un répartiteur** | Un seul serveur d'application rendrait inutile la disponibilité du Replica Set : sa panne arrêterait tous les virements. | ADR-002 |
-| **Surveillance** | Trois seuils à suivre en continu : working set au-delà de 60 % de la RAM, index au-delà de 45 octets par entrée, retard d'un secondary au-delà de 30 à 60 s. | annexe A, sections 2 bis et 3 ; ADR-002 |
+| **Surveillance** | Trois seuils à suivre en continu : working set au-delà de 50 % de la RAM, index au-delà de 45 octets par entrée, retard d'un secondary au-delà de 30 à 60 s. | annexe A, sections 2 bis et 3 ; ADR-002 |
 
 ## 9.4 Composants écartés, avec le seuil qui les ferait revenir
 
 | Composant | Pourquoi pas aujourd'hui (nos chiffres) | Nous le réintroduisons quand… |
 |---|---|---|
-| **Sharding** | 400 M tx/an ; working set à 40 % de la RAM ; 0,31 To par an non compressé. Si un jour il faut sharder, la clé est prête : `{ walletCle: "hashed" }` (Partie 6). | le volume dépasse **490 M tx/an** (working set à 50 % de la RAM sur 64 Go), au plus tard 600 M (60 %) ; **ou** le test de charge montre que les écritures dépassent **50 % du débit du primary** même après une montée en gamme. |
+| **Sharding** | 400 M tx/an ; working set à 40 % de la RAM ; 0,31 To par an non compressé. Si un jour il faut sharder, la clé est prête : `{ walletCle: "hashed" }` (Partie 6). | le volume dépasse **490 M tx/an** (working set à 50 % de la RAM sur 64 Go, soit la taille du cache) ; **ou** le test de charge montre que les écritures dépassent **50 % du débit du primary** même après une montée en gamme. |
 | **Kafka** | Un seul consommateur des événements (le relais de notifications), servi par un Change Stream avec jeton de reprise. Kafka ajouterait un cluster de plus à exploiter (au moins 3 nœuds) pour un seul lecteur. | un **deuxième consommateur indépendant** (détection de fraude en temps réel, comptabilité) doit relire les événements au-delà de la fenêtre de l'oplog ; **ou** le relais prend plus de **60 s de retard** au pic de 1 200 tx/s. |
 | **Spark / Data Lake** | Environ 615 Mo de données nouvelles par jour ; le `$merge` quotidien suffit et E3 prend 23 ms. | plus de **1 To à transformer par cycle** de calcul, **ou** des sources hors MongoDB à croiser (relevés des opérateurs télécom, des banques partenaires). |
-| **Redis pour le solde** | Les 3 M soldes pèsent 0,43 Go et tiennent dans le cache ; une lecture de solde par index prend 0 ms en médiane (Q3). Un cache ajouterait un risque : un solde affiché différent du solde réel, ce qui est justement la plainte du support. | une lecture de solde au-delà de **20 ms au p99** sous charge, **ou** plus de **20 000 lectures de solde par seconde** soutenues. |
+| **Redis pour le solde** | Les 3 M soldes pèsent 0,43 Go et tiennent dans le cache ; une lecture par index unique, comme celle d'un solde par `_id`, prend 0 ms en médiane (Q3). Un cache ajouterait un risque : un solde affiché différent du solde réel, ce qui est justement la plainte du support. | une lecture de solde au-delà de **20 ms au p99** sous charge, **ou** plus de **20 000 lectures de solde par seconde** soutenues. |
 | **Architecture Lambda** | Pas de besoin cumulé de temps réel et de recalcul historique lourd : le Change Stream couvre le temps réel, le `$merge` le recalcul. | les deux besoins à la fois, sans qu'un seul moteur puisse les servir. |
-| **Nœuds de 128 Go** (montée en gamme) | 64 Go suffisent avec nos 27 octets d'index par entrée. | les index dépassent **45 octets par entrée**, **ou** le working set dépasse **60 % de la RAM** (annexe A, section 2 bis). |
+| **Nœuds de 128 Go** (montée en gamme) | 64 Go suffisent avec nos 27 octets d'index par entrée. | les index dépassent **45 octets par entrée**, **ou** le working set dépasse **50 % de la RAM** (annexe A, section 2 bis). |
 
 ## 9.5 Sécurité et conformité
 
@@ -73,7 +73,7 @@ Le ledger devient ainsi un journal en **ajout seul** pour l'application : même 
 **Conservation des données de paiement.** Les lignes de ledger ne sont jamais modifiées ni supprimées par l'application. Les données de plus de 2 ans quittent les nœuds pour une archive chiffrée (hypothèse 9 de l'annexe A). Nous ne fixons pas de durée légale de conservation nous-mêmes : elle doit être validée avec le juriste de FasoPay et les autorités ci-dessous.
 
 **Autorités à consulter.**
-- La **Commission de l'Informatique et des Libertés (CIL)** du Burkina Faso, autorité de protection des données personnelles, créée par la loi n° 010-2004/AN du 20 avril 2004 ; le cadre a été actualisé par la loi n° 001-2021/AN du 30 mars 2021. Une question est à lui poser avant tout déploiement : nos serveurs sont en Allemagne et en Finlande (section 9.6), il s'agit donc d'un transfert de données personnelles hors du pays.
+- La **Commission de l'Informatique et des Libertés (CIL)** du Burkina Faso, autorité de protection des données personnelles, créée par la loi n° 010-2004/AN du 20 avril 2004 ; le cadre a été actualisé par la loi n° 001-2021/AN du 30 mars 2021. Une question est à lui poser avant tout déploiement : nos serveurs sont en Allemagne et en Finlande (section 9.5), il s'agit donc d'un transfert de données personnelles hors du pays.
 - La **BCEAO**, qui délivre l'agrément des établissements émetteurs de monnaie électronique dans l'UEMOA : ses exigences s'imposent à FasoPay en plus de celles de la CIL.
 
 ## 9.6 Coût indicatif mensuel
@@ -94,7 +94,7 @@ Une seule fois : frais d'installation des 3 EX63, 3 × 74 € = **222 €, soit 
 1. Prix publics hors TVA, sans remise, relevés en novembre 2026 ; ils peuvent changer.
 2. Nous avons écarté le serveur EX44 (59 €) : sa mémoire n'a pas de correction d'erreurs (ECC), un risque que nous ne prenons pas pour des soldes.
 3. Les 3 nœuds sont placés dans des centres de données différents de l'hébergeur (Allemagne et Finlande), pour qu'un incident de site n'arrête pas la majorité.
-4. Le coût ne comprend ni les personnes (exploitation, astreinte), ni l'envoi des SMS, ni le trafic au-delà du volume inclus, ni une licence MongoDB Enterprise (section 9.5).
+4. Le coût ne comprend ni les personnes (exploitation, astreinte), ni l'envoi des SMS, ni le trafic au-delà du volume inclus, ni une licence MongoDB Enterprise (section 9.4).
 5. Un hébergement au Burkina Faso ou dans l'UEMOA, si la CIL ou la BCEAO l'exigent, changerait ce coût : nous n'avons pas de prix vérifié à donner.
 6. La latence entre Ouagadougou et l'Europe n'est pas mesurée ; elle doit rester compatible avec un p95 inférieur à 300 ms par virement (Partie 1).
 

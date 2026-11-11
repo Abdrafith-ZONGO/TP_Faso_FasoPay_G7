@@ -17,7 +17,7 @@ Une seule transaction pour la transaction, les deux lignes de ledger, les soldes
 Alerte automatique dans `fraud_alerts` pour les découpages sous le plafond journalier (E2 : 5 wallets aujourd'hui) ; read model `ca_marchands` pour le tableau de bord et les règlements, lu sur un secondary ; relais outbox pour les notifications. Consulter dès maintenant la **CIL** (serveurs hors du Burkina Faso) et intégrer les exigences de la **BCEAO**.
 
 **5. Mesurer avant de grandir (mois 4 à 12).**
-Test de charge sur le matériel cible avant la mise en production : il faut **2 400 virements/s** sur le primary, nous en avons mesuré 330 sur un portable. Puis suivre chaque mois les seuils qui déclenchent la suite : working set au-delà de 60 % de la RAM, index au-delà de 45 octets par entrée, volume vers 490 M tx/an. La clé de sharding est déjà choisie (`{ walletCle: "hashed" }`) : le jour venu, nous saurons quoi faire.
+Test de charge sur le matériel cible avant la mise en production : il faut **2 400 virements/s** sur le primary, nous en avons mesuré 330 sur un portable. Puis suivre chaque mois les seuils qui déclenchent la suite : working set au-delà de 50 % de la RAM, index au-delà de 45 octets par entrée, volume vers 490 M tx/an. La clé de sharding est déjà choisie (`{ walletCle: "hashed" }`) : le jour venu, nous saurons quoi faire.
 
 ## Ce que nous ne ferons PAS
 
@@ -25,7 +25,7 @@ Test de charge sur le matériel cible avant la mise en production : il faut **2 
 |---|---|---|
 | Kafka | un seul consommateur des événements | un deuxième consommateur indépendant doit les relire |
 | Spark ou un Data Lake | 615 Mo de données nouvelles par jour ; E3 en 23 ms | plus de 1 To à transformer par cycle |
-| Redis devant les soldes | 0,43 Go de soldes en cache, lecture en 0 ms médiane ; un cache créerait un second solde qui peut diverger | p99 du solde au-delà de 20 ms sous charge |
+| Redis devant les soldes | 0,43 Go de soldes en cache, lecture par index unique en 0 ms médiane (Q3) ; un cache créerait un second solde qui peut diverger | p99 du solde au-delà de 20 ms sous charge |
 | Sharding | 400 M tx/an, working set à 40 % de la RAM | 490 M tx/an ou test de charge insuffisant |
 | Une architecture Lambda | pas de double besoin temps réel + recalcul lourd | les deux besoins à la fois |
 | Modifier ou supprimer une ligne de ledger | le ledger est la preuve de l'argent ; une erreur se corrige par une écriture de correction | jamais |

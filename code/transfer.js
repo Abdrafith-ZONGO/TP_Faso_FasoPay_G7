@@ -19,7 +19,7 @@
 function transfer(fromWalletId, toWalletId, amount, idempotencyKey, opts) {
   opts = opts || {};
   var base = db;          // la base courante au moment de l'appel (celle du correcteur, ou fasopay_test chez nous)
-  var MAX_ESSAIS = 10;    // nombre maximum de tentatives quand MongoDB signale un conflit passager
+  var MAX_ESSAIS = 60;    // nombre maximum de tentatives quand MongoDB signale un conflit passager
 
   // ---------------------------------------------------------------------------
   // 1. Contrôles de départ, sans toucher à la base
@@ -124,7 +124,7 @@ function transfer(fromWalletId, toWalletId, amount, idempotencyKey, opts) {
         }
         if (aLabel(e, "TransientTransactionError") && essai < MAX_ESSAIS) {
           // Conflit passager (par exemple deux clients sur le même wallet) : on attend un peu et on recommence.
-          sleep(Math.floor(Math.random() * 50));
+          sleep(Math.floor(Math.random() * Math.min(25 * essai, 250)));
           continue;
         }
         throw e;
@@ -145,7 +145,7 @@ function transfer(fromWalletId, toWalletId, amount, idempotencyKey, opts) {
           throw e;
         }
       }
-      sleep(Math.floor(Math.random() * 50));
+      sleep(Math.floor(Math.random() * Math.min(25 * essai, 250)));
     }
     throw new Error("transfer : abandon après " + MAX_ESSAIS + " essais (conflits répétés)");
   } finally {

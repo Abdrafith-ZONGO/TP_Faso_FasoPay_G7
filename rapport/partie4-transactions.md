@@ -32,11 +32,11 @@ Pour 5 des 10 refus (émetteur absent ou gelé, destinataire gelé ou absent, so
 **Abort prouvé.** Avec `failAfterFirstWrite`, nous montrons trois choses. D'abord, juste après la première écriture, le document de la transaction est lu **dans** la transaction, alors qu'une lecture **hors** de la transaction renvoie `null` au même instant : l'écriture existe, isolée. Ensuite, le profileur du serveur a enregistré cette insertion (`ninserted: 1`, `txnNumber: 8`, `startTransaction: true`), et le compteur d'annulations du serveur passe de 5 à 6. Enfin, après l'erreur `CRASH_SIMULATED`, le document a disparu, et les comptages comme les soldes sont identiques à ceux d'avant. Ce que ce test ne montre pas : une panne réelle du serveur au milieu de la transaction ; c'est l'objet de la Partie 5.
 
 ## 4.4 Concurrence
-Résultat : 10 vérifications OK sur 10 (`preuves/04-concurrence.txt`). Deux processus `mongosh` partent à la même heure (19:51:51.883 et 19:51:51.881) et envoient chacun 25 virements de 100 FCFA depuis W_CONC, qui contient 3 000 FCFA. Leurs opérations s'entremêlent à la milliseconde, et MongoDB a signalé 6 conflits d'écriture, tous rejoués par `transfer()`.
+Résultat : 10 vérifications OK sur 10 (`preuves/04-concurrence.txt`). Deux processus `mongosh` partent à la même heure (20:49:03.897 et 20:49:03.895) et envoient chacun 25 virements de 100 FCFA depuis W_CONC, qui contient 3 000 FCFA. Leurs opérations s'entremêlent à la milliseconde, et MongoDB a signalé 9 conflits d'écriture, tous rejoués par `transfer()`.
 
 | Invariant demandé | Mesuré |
 |---|---|
-| Exactement 30 virements acceptés | 30 (19 pour le client A, 11 pour le client B), 20 refus `INSUFFICIENT_FUNDS`, 0 erreur |
+| Exactement 30 virements acceptés | 30 (17 pour le client A, 13 pour le client B), 20 refus `INSUFFICIENT_FUNDS`, 0 erreur |
 | Solde jamais négatif | solde final 0, plus petit `balanceAfter` de W_CONC égal à 0 |
 | Monnaie conservée | W_CONC + W_CONC_DEST = 0 + 3 000 = 3 000 |
 | Ledger = 2 × virements | 60 = 2 × 30 |

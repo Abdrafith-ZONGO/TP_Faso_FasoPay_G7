@@ -1,7 +1,7 @@
 
 === Partie 4 : préparation de la base de test fasopay_test ===
 Commande : mongosh fasopay_test --quiet --file /tmp/code/04-base-test.js
-Date : Mon Nov  9 19:51:44 UTC 2026
+Date : Wed Nov 11 20:48:56 UTC 2026
 base : fasopay_test
 collections : ["ledger_entries","outbox","transactions","wallets"]
 index de transactions : ["_id_","uniq_idempotency_key"]
@@ -17,76 +17,76 @@ index de transactions : ["_id_","uniq_idempotency_key"]
 
 === Partie 4 : préparation du test de concurrence ===
 Commande : mongosh fasopay_test --quiet --eval "load('/tmp/code/04-concurrence.js'); preparer()"
-Date : Mon Nov  9 19:51:45 UTC 2026
-préparé : W_CONC = 3000, W_CONC_DEST = 0, W_MC = 10000, W_MC_DEST = 0 ; départ commun à 2026-11-09T19:51:51.881Z
+Date : Wed Nov 11 20:48:57 UTC 2026
+préparé : W_CONC = 3000, W_CONC_DEST = 0, W_MC = 10000, W_MC_DEST = 0 ; départ commun à 2026-11-11T20:49:03.894Z
 
 === Partie 4 : deux clients lancés en même temps (deux processus mongosh en parallèle) ===
 Commande : mongosh fasopay_test --quiet --eval "load('/tmp/code/04-concurrence.js'); client('A')" > /tmp/preuves/client-A.log 2>&1 & mongosh fasopay_test --quiet --eval "load('/tmp/code/04-concurrence.js'); client('B')" > /tmp/preuves/client-B.log 2>&1 & wait
-Date : Mon Nov  9 19:51:45 UTC 2026
+Date : Wed Nov 11 20:48:57 UTC 2026
 --- sortie du client A ---
-client A : départ à 2026-11-09T19:51:51.883Z
-2026-11-09T19:51:51.916Z | A | cle-commune-1 | {"ok":true,"replay":false,"txId":"T6af224579a8f0044b6284e73"}
-2026-11-09T19:51:51.917Z | A | conc-A-01 | ACCEPTÉ | essais=1
-2026-11-09T19:51:51.931Z | A | conc-A-02 | ACCEPTÉ | essais=1
-2026-11-09T19:51:51.942Z | A | conc-A-03 | ACCEPTÉ | essais=1
-2026-11-09T19:51:51.952Z | A | conc-A-04 | ACCEPTÉ | essais=1
-2026-11-09T19:51:51.962Z | A | conc-A-05 | ACCEPTÉ | essais=1
-2026-11-09T19:51:51.972Z | A | conc-A-06 | ACCEPTÉ | essais=1
-2026-11-09T19:51:51.982Z | A | conc-A-07 | ACCEPTÉ | essais=1
-2026-11-09T19:51:51.994Z | A | conc-A-08 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.005Z | A | conc-A-09 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.015Z | A | conc-A-10 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.024Z | A | conc-A-11 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.034Z | A | conc-A-12 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.044Z | A | conc-A-13 | ACCEPTÉ | essais=2
-2026-11-09T19:51:52.096Z | A | conc-A-14 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.106Z | A | conc-A-15 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.115Z | A | conc-A-16 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.124Z | A | conc-A-17 | ACCEPTÉ | essais=3
-2026-11-09T19:51:52.190Z | A | conc-A-18 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.202Z | A | conc-A-19 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.212Z | A | conc-A-20 | INSUFFICIENT_FUNDS | essais=2
-2026-11-09T19:51:52.252Z | A | conc-A-21 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.258Z | A | conc-A-22 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.263Z | A | conc-A-23 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.269Z | A | conc-A-24 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.274Z | A | conc-A-25 | INSUFFICIENT_FUNDS | essais=1
-client A : fin à 2026-11-09T19:51:52.280Z ; acceptés=19, refusés=6, erreurs=0, virements rejoués après un conflit=3
+client A : départ à 2026-11-11T20:49:03.897Z
+2026-11-11T20:49:03.941Z | A | cle-commune-1 | {"ok":true,"replay":false,"txId":"T6af4d4bf28aa9e6e630a86c5"}
+2026-11-11T20:49:03.941Z | A | conc-A-01 | ACCEPTÉ | essais=1
+2026-11-11T20:49:03.956Z | A | conc-A-02 | ACCEPTÉ | essais=2
+2026-11-11T20:49:03.982Z | A | conc-A-03 | ACCEPTÉ | essais=1
+2026-11-11T20:49:03.992Z | A | conc-A-04 | ACCEPTÉ | essais=2
+2026-11-11T20:49:04.015Z | A | conc-A-05 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.025Z | A | conc-A-06 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.036Z | A | conc-A-07 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.045Z | A | conc-A-08 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.055Z | A | conc-A-09 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.069Z | A | conc-A-10 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.078Z | A | conc-A-11 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.088Z | A | conc-A-12 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.099Z | A | conc-A-13 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.115Z | A | conc-A-14 | ACCEPTÉ | essais=3
+2026-11-11T20:49:04.190Z | A | conc-A-15 | ACCEPTÉ | essais=2
+2026-11-11T20:49:04.209Z | A | conc-A-16 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.220Z | A | conc-A-17 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.229Z | A | conc-A-18 | INSUFFICIENT_FUNDS | essais=2
+2026-11-11T20:49:04.248Z | A | conc-A-19 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.253Z | A | conc-A-20 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.259Z | A | conc-A-21 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.264Z | A | conc-A-22 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.269Z | A | conc-A-23 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.275Z | A | conc-A-24 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.281Z | A | conc-A-25 | INSUFFICIENT_FUNDS | essais=1
+client A : fin à 2026-11-11T20:49:04.286Z ; acceptés=17, refusés=8, erreurs=0, virements rejoués après un conflit=5
 --- sortie du client B ---
-client B : départ à 2026-11-09T19:51:51.881Z
-2026-11-09T19:51:51.972Z | B | cle-commune-1 | {"ok":true,"replay":true,"txId":"T6af224579a8f0044b6284e73","status":"COMPLETED"}
-2026-11-09T19:51:51.972Z | B | conc-B-01 | ACCEPTÉ | essais=3
-2026-11-09T19:51:52.054Z | B | conc-B-02 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.068Z | B | conc-B-03 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.079Z | B | conc-B-04 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.089Z | B | conc-B-05 | ACCEPTÉ | essais=2
-2026-11-09T19:51:52.134Z | B | conc-B-06 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.145Z | B | conc-B-07 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.155Z | B | conc-B-08 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.170Z | B | conc-B-09 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.181Z | B | conc-B-10 | ACCEPTÉ | essais=2
-2026-11-09T19:51:52.221Z | B | conc-B-11 | ACCEPTÉ | essais=1
-2026-11-09T19:51:52.233Z | B | conc-B-12 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.240Z | B | conc-B-13 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.245Z | B | conc-B-14 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.251Z | B | conc-B-15 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.258Z | B | conc-B-16 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.264Z | B | conc-B-17 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.269Z | B | conc-B-18 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.274Z | B | conc-B-19 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.280Z | B | conc-B-20 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.286Z | B | conc-B-21 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.292Z | B | conc-B-22 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.297Z | B | conc-B-23 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.302Z | B | conc-B-24 | INSUFFICIENT_FUNDS | essais=1
-2026-11-09T19:51:52.308Z | B | conc-B-25 | INSUFFICIENT_FUNDS | essais=1
-client B : fin à 2026-11-09T19:51:52.313Z ; acceptés=11, refusés=14, erreurs=0, virements rejoués après un conflit=3
+client B : départ à 2026-11-11T20:49:03.895Z
+2026-11-11T20:49:03.948Z | B | cle-commune-1 | {"ok":true,"replay":true,"txId":"T6af4d4bf28aa9e6e630a86c5","status":"COMPLETED"}
+2026-11-11T20:49:03.948Z | B | conc-B-01 | ACCEPTÉ | essais=1
+2026-11-11T20:49:03.963Z | B | conc-B-02 | ACCEPTÉ | essais=1
+2026-11-11T20:49:03.974Z | B | conc-B-03 | ACCEPTÉ | essais=2
+2026-11-11T20:49:04.005Z | B | conc-B-04 | ACCEPTÉ | essais=4
+2026-11-11T20:49:04.122Z | B | conc-B-05 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.135Z | B | conc-B-06 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.147Z | B | conc-B-07 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.158Z | B | conc-B-08 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.172Z | B | conc-B-09 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.182Z | B | conc-B-10 | ACCEPTÉ | essais=2
+2026-11-11T20:49:04.199Z | B | conc-B-11 | ACCEPTÉ | essais=2
+2026-11-11T20:49:04.224Z | B | conc-B-12 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.237Z | B | conc-B-13 | ACCEPTÉ | essais=1
+2026-11-11T20:49:04.246Z | B | conc-B-14 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.253Z | B | conc-B-15 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.258Z | B | conc-B-16 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.264Z | B | conc-B-17 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.269Z | B | conc-B-18 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.274Z | B | conc-B-19 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.280Z | B | conc-B-20 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.285Z | B | conc-B-21 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.290Z | B | conc-B-22 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.297Z | B | conc-B-23 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.303Z | B | conc-B-24 | INSUFFICIENT_FUNDS | essais=1
+2026-11-11T20:49:04.309Z | B | conc-B-25 | INSUFFICIENT_FUNDS | essais=1
+client B : fin à 2026-11-11T20:49:04.318Z ; acceptés=13, refusés=12, erreurs=0, virements rejoués après un conflit=4
 
 === Partie 4 : vérification des invariants ===
 Commande : mongosh fasopay_test --quiet --eval "load('/tmp/code/04-concurrence.js'); verifier()"
-Date : Mon Nov  9 19:51:52 UTC 2026
-client A : {"_id":"client-A","acceptes":19,"refuses":6,"erreurs":0,"rejoues":3,"cleCommune":{"ok":true,"replay":false,"txId":"T6af224579a8f0044b6284e73"}}
-client B : {"_id":"client-B","acceptes":11,"refuses":14,"erreurs":0,"rejoues":3,"cleCommune":{"ok":true,"replay":true,"txId":"T6af224579a8f0044b6284e73","status":"COMPLETED"}}
+Date : Wed Nov 11 20:49:04 UTC 2026
+client A : {"_id":"client-A","acceptes":17,"refuses":8,"erreurs":0,"rejoues":5,"cleCommune":{"ok":true,"replay":false,"txId":"T6af4d4bf28aa9e6e630a86c5"}}
+client B : {"_id":"client-B","acceptes":13,"refuses":12,"erreurs":0,"rejoues":4,"cleCommune":{"ok":true,"replay":true,"txId":"T6af4d4bf28aa9e6e630a86c5","status":"COMPLETED"}}
 
 virements acceptés en base : 30 ; W_CONC = 0 ; W_CONC_DEST = 3000 ; lignes de ledger = 60 ; outbox = 30 ; plus petit balanceAfter de W_CONC = 0
 OK     exactement 30 virements acceptés (en base, et selon les clients : 30)
@@ -95,9 +95,9 @@ OK     solde final jamais négatif : W_CONC = 0, aucun balanceAfter < 0
 OK     monnaie conservée : W_CONC + W_CONC_DEST = 3000 (3000 au départ)
 OK     ledger = 2 × virements : 60 = 2 × 30
 OK     outbox = virements : 30 = 30
-OK     les deux clients ont vraiment travaillé en même temps (conflits réglés par des réessais : 6)
+OK     les deux clients ont vraiment travaillé en même temps (conflits réglés par des réessais : 9)
 
-même clé : A a reçu {"ok":true,"replay":false,"txId":"T6af224579a8f0044b6284e73"} ; B a reçu {"ok":true,"replay":true,"txId":"T6af224579a8f0044b6284e73","status":"COMPLETED"}
+même clé : A a reçu {"ok":true,"replay":false,"txId":"T6af4d4bf28aa9e6e630a86c5"} ; B a reçu {"ok":true,"replay":true,"txId":"T6af4d4bf28aa9e6e630a86c5","status":"COMPLETED"}
 OK     même clé envoyée par 2 clients : 1 seul document transactions
 OK     W_MC débité une seule fois : 9500 (10000 - 500), W_MC_DEST = 500
 OK     les deux clients ont reçu le même txId

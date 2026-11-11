@@ -1,7 +1,7 @@
 
 === Partie 4 : préparation de la base de test fasopay_test ===
 Commande : mongosh fasopay_test --quiet --file /tmp/code/04-base-test.js
-Date : Mon Nov  9 19:49:21 UTC 2026
+Date : Wed Nov 11 20:48:31 UTC 2026
 base : fasopay_test
 collections : ["ledger_entries","outbox","transactions","wallets"]
 index de transactions : ["_id_","uniq_idempotency_key"]
@@ -17,7 +17,7 @@ index de transactions : ["_id_","uniq_idempotency_key"]
 
 === Partie 4 : tests de transfer() (chargement, succès, 3 rejeux, refus, abort prouvé, réponse perdue) ===
 Commande : mongosh fasopay_test --quiet --file /tmp/code/04-tests.js
-Date : Mon Nov  9 19:49:22 UTC 2026
+Date : Wed Nov 11 20:48:32 UTC 2026
 
 ==================== TEST 0 : le chargement de transfer.js n'a aucun effet ====================
 avant : {"transactions":0,"ledger_entries":0,"outbox":0,"W_A":100000,"W_B":0,"W_PETIT":500,"W_GEL":50000} ["ledger_entries","outbox","transactions","wallets"]
@@ -27,11 +27,11 @@ OK     la fonction transfer est définie
 
 ==================== TEST 1 : virement réussi de 1 500 FCFA de W_A vers W_B ====================
 avant : {"transactions":0,"ledger_entries":0,"outbox":0,"W_A":100000,"W_B":0,"W_PETIT":500,"W_GEL":50000}
-réponse : {"ok":true,"replay":false,"txId":"T6af223c30115189549813ecd"}
+réponse : {"ok":true,"replay":false,"txId":"T6af4d4a0b5f6410dd4d89871"}
 après : {"transactions":1,"ledger_entries":2,"outbox":1,"W_A":98500,"W_B":1500,"W_PETIT":500,"W_GEL":50000}
 document transactions :
 {
-  _id: 'T6af223c30115189549813ecd',
+  _id: 'T6af4d4a0b5f6410dd4d89871',
   idempotencyKey: 'test-succes-1',
   type: 'P2P',
   fromWalletId: 'W_A',
@@ -40,50 +40,50 @@ document transactions :
   fee: 0,
   status: 'COMPLETED',
   channel: 'APP',
-  createdAt: ISODate('2026-11-09T19:49:23.032Z'),
-  completedAt: ISODate('2026-11-09T19:49:23.032Z'),
+  createdAt: ISODate('2026-11-11T20:48:32.556Z'),
+  completedAt: ISODate('2026-11-11T20:48:32.556Z'),
   riskScore: 0,
   flags: []
 }
 lignes de ledger :
 {
-  _id: 'T6af223c30115189549813ecd-D',
-  txId: 'T6af223c30115189549813ecd',
+  _id: 'T6af4d4a0b5f6410dd4d89871-D',
+  txId: 'T6af4d4a0b5f6410dd4d89871',
   walletId: 'W_A',
   direction: 'DEBIT',
   amount: 1500,
   balanceAfter: 98500,
-  createdAt: ISODate('2026-11-09T19:49:23.032Z')
+  createdAt: ISODate('2026-11-11T20:48:32.556Z')
 }
 {
-  _id: 'T6af223c30115189549813ecd-C',
-  txId: 'T6af223c30115189549813ecd',
+  _id: 'T6af4d4a0b5f6410dd4d89871-C',
+  txId: 'T6af4d4a0b5f6410dd4d89871',
   walletId: 'W_B',
   direction: 'CREDIT',
   amount: 1500,
   balanceAfter: 1500,
-  createdAt: ISODate('2026-11-09T19:49:23.032Z')
+  createdAt: ISODate('2026-11-11T20:48:32.556Z')
 }
 document outbox :
 {
-  _id: 'T6af223c30115189549813ecd',
+  _id: 'T6af4d4a0b5f6410dd4d89871',
   type: 'TRANSFER_COMPLETED',
-  txId: 'T6af223c30115189549813ecd',
+  txId: 'T6af4d4a0b5f6410dd4d89871',
   status: 'PENDING',
-  createdAt: ISODate('2026-11-09T19:49:23.032Z')
+  createdAt: ISODate('2026-11-11T20:48:32.556Z')
 }
 wallets :
 {
   _id: 'W_A',
   balance: 98500,
   version: 1,
-  updatedAt: ISODate('2026-11-09T19:49:23.032Z')
+  updatedAt: ISODate('2026-11-11T20:48:32.556Z')
 }
 {
   _id: 'W_B',
   balance: 1500,
   version: 1,
-  updatedAt: ISODate('2026-11-09T19:49:23.032Z')
+  updatedAt: ISODate('2026-11-11T20:48:32.556Z')
 }
 OK     réponse { ok: true, replay: false, txId }
 OK     +1 transaction, +2 lignes de ledger, +1 outbox
@@ -95,10 +95,10 @@ OK     les montants sont stockés en entiers (int), jamais en double
 
 ==================== TEST 2 : idempotence, 1 appel puis 3 rejeux de la même clé (2 000 FCFA) ====================
 avant : {"transactions":1,"ledger_entries":2,"outbox":1,"W_A":98500,"W_B":1500,"W_PETIT":500,"W_GEL":50000}
-appel 1 : {"ok":true,"replay":false,"txId":"T6af223c30115189549813ece"}
-appel 2 (rejeu) : {"ok":true,"replay":true,"txId":"T6af223c30115189549813ece","status":"COMPLETED"}
-appel 3 (rejeu) : {"ok":true,"replay":true,"txId":"T6af223c30115189549813ece","status":"COMPLETED"}
-appel 4 (rejeu) : {"ok":true,"replay":true,"txId":"T6af223c30115189549813ece","status":"COMPLETED"}
+appel 1 : {"ok":true,"replay":false,"txId":"T6af4d4a0b5f6410dd4d89872"}
+appel 2 (rejeu) : {"ok":true,"replay":true,"txId":"T6af4d4a0b5f6410dd4d89872","status":"COMPLETED"}
+appel 3 (rejeu) : {"ok":true,"replay":true,"txId":"T6af4d4a0b5f6410dd4d89872","status":"COMPLETED"}
+appel 4 (rejeu) : {"ok":true,"replay":true,"txId":"T6af4d4a0b5f6410dd4d89872","status":"COMPLETED"}
 après : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
 OK     1 seul document transactions pour cette clé
 OK     +1 transaction, +2 lignes de ledger, +1 outbox au total (pas 4)
@@ -132,7 +132,7 @@ OK       refus INSUFFICIENT_FUNDS, état identique avant / après, clé absente 
 avant : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
 compteurs du serveur avant : démarrées=7, validées=2, annulées=5
 pendant la transaction, juste après la première écriture :
-  lu DANS la transaction : {"_id":"T6af223c30115189549813ed4","idempotencyKey":"test-abort-1","type":"P2P","fromWalletId":"W_A","toWalletId":"W_B","amount":777,"fee":0,"status":"COMPLETED","channel":"APP","createdAt":"2026-11-09T19:49:23.308Z","completedAt":"2026-11-09T19:49:23.308Z","riskScore":0,"flags":[]}
+  lu DANS la transaction : {"_id":"T6af4d4a0b5f6410dd4d89878","idempotencyKey":"test-abort-1","type":"P2P","fromWalletId":"W_A","toWalletId":"W_B","amount":777,"fee":0,"status":"COMPLETED","channel":"APP","createdAt":"2026-11-11T20:48:32.794Z","completedAt":"2026-11-11T20:48:32.794Z","riskScore":0,"flags":[]}
   lu HORS de la transaction : null
 réponse : {"ok":false,"error":"CRASH_SIMULATED"}
 après : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
@@ -148,7 +148,7 @@ trace du profileur (insertion dans transactions pendant le test) :
   },
   ninserted: 1,
   keysInserted: 2,
-  ts: ISODate('2026-11-09T19:49:23.308Z')
+  ts: ISODate('2026-11-11T20:48:32.795Z')
 }
 OK     l'écriture a eu lieu : le document est lu DANS la transaction
 OK     isolation : HORS de la transaction, il est invisible
@@ -159,8 +159,8 @@ OK     le serveur compte une transaction annulée de plus
 
 ==================== TEST 5 : la réponse est perdue, le client réessaie avec la même clé ====================
 avant : {"transactions":2,"ledger_entries":4,"outbox":2,"W_A":96500,"W_B":3500,"W_PETIT":500,"W_GEL":50000}
-(réponse que le client n'a pas reçue : {"ok":true,"replay":false,"txId":"T6af223c30115189549813ed5"})
-réponse au réessai : {"ok":true,"replay":true,"txId":"T6af223c30115189549813ed5","status":"COMPLETED"}
+(réponse que le client n'a pas reçue : {"ok":true,"replay":false,"txId":"T6af4d4a0b5f6410dd4d89879"})
+réponse au réessai : {"ok":true,"replay":true,"txId":"T6af4d4a0b5f6410dd4d89879","status":"COMPLETED"}
 après : {"transactions":3,"ledger_entries":6,"outbox":3,"W_A":96200,"W_B":3800,"W_PETIT":500,"W_GEL":50000}
 OK     le réessai est reconnu comme un rejeu, avec le même txId
 OK     W_A débité une seule fois (300)

@@ -135,6 +135,8 @@
 		
 		\vfill
 		{\large Enseignant : M. Gael BARRY\par}
+		\vspace{0.4cm}
+		{\small Dépôt Git : \url{https://github.com/Abdrafith-ZONGO/TP_Faso_FasoPay_G7}\par}
 		\vspace{0.6cm}
 		{\normalsize Année universitaire 2026-2027 \quad·\quad Novembre 2026\par}
 	\end{titlepage}
@@ -168,8 +170,8 @@
 	
 	\textbf{Notre principe de travail.} Nous ne prétendons rien que nous n'ayons mesuré nous-mêmes. Chaque chiffre de ce rapport renvoie à un fichier de \code{preuves/} (commande exacte, date \code{date -u}, sortie brute), produit par une commande de l'annexe B. Quand une mesure contredit notre architecture, nous la montrons au lieu de la cacher (Partie 0).
 	
-	\subsection*{Notre jeu de données (groupe 07)}
-	2 000 clients, 150 marchands, 60 000 transactions sur 181 jours à partir du 1\textsuperscript{er} janvier 2026. Notre vérification D3, écrite par nous, retrouve chaque chiffre du \code{fingerprint.json} (\preuve{00-fingerprint.txt}) :
+	\subsection*{Notre jeu de données}
+	2 000 clients, 150 marchands, 60 000 transactions sur 181 jours, du 31 décembre 2025 au 30 juin 2026 (heures UTC). Notre vérification D3, écrite par nous, retrouve chaque chiffre du \code{fingerprint.json} (\preuve{00-fingerprint.txt}) :
 	
 	\begin{center}\small
 		\begin{tabular}{@{}lrr@{}}
@@ -188,7 +190,7 @@
 	Les types ont été contrôlés après l'import : montants en \code{int}, dates en \code{date}, seul \code{feePct} en \code{double} (\preuve{00-types.txt}). Les collections de traitement \code{outbox} et \code{fraud_alerts} ont été créées vides (D4).
 	
 	\subsection*{Notre environnement}
-	Windows, Docker 29.8.0, MongoDB 8.0.34 (image \code{mongo:8.0}) et mongosh 2.14.0, avec environ 8,17 Go de mémoire visibles par Docker. Nous avons monté nous-mêmes quatre environnements, tous décrits commande par commande en annexe B : le serveur du TP \code{mongo-rs1} (Replica Set \code{rs0} à un nœud, Parties 0 à 4), le Replica Set \code{rs-fasopay} à trois nœuds (Partie 5), un cluster shardé à trois shards (Partie 6) et un serveur de test avec authentification (Partie 7).
+	Windows, Docker 29.8.0, MongoDB 8.0.34 (image \code{mongo:8.0}) et mongosh 2.14.0, avec environ 8,17 Go de mémoire visibles par Docker. Nous avons monté nous-mêmes quatre environnements, tous décrits commande par commande en annexe B : le serveur du TP \code{mongo-rs1} (Replica Set \code{rs0} à un nœud, Parties 0 à 4), le Replica Set \code{rs-fasopay} à trois nœuds (Partie 5), un cluster shardé à trois shards (Partie 6) et un serveur de test avec authentification (Partie 7). La contribution de chaque membre est détaillée en annexe F.
 	
 	\textbf{Pourquoi un Replica Set, même à un seul nœud ?} Les transactions multi-documents, indispensables à un virement (Partie 4), s'appuient sur l'oplog, le journal des opérations que tient un Replica Set. Un serveur MongoDB isolé les refuse. Le mode Replica Set est donc obligatoire dès la Partie 0, même avec un seul membre ; à un nœud, la majorité vaut 1 et \code{w: "majority"} équivaut à \code{w: 1}, ce qui nous a conduits à rejouer nos tests sur trois nœuds (Partie 5). État vérifié : \code{set: rs0}, \code{myState: 1} (PRIMARY), un membre (\preuve{00-rs-status-1-noeud.txt}).
 	
@@ -209,13 +211,13 @@
 			Écritures au pic & $1\,200$ tx/s $\times$ 6 documents (ADR-001) & 7 200 documents/s \\
 			Working set & 30 jours de transactions (18,4 Go) + leurs index (6,9 Go) + 3 M wallets et leur index (0,6 Go) & \textbf{25,9 Go} \\
 			RAM par nœud & cache $\approx 50\,\% \times (\text{RAM} - 1\,\text{Go}) \geq 25{,}9$ Go, donc RAM $\geq 52{,}8$ Go & \textbf{64 Go} \\
-			Disque & 198,5 Go par an après compression (0,51 mesurée), sur 1,4 To utilisables & 7,1 ans \\
+			Disque & 198,5 Go par an après compression (0,51 mesurée), sur 700 Go utilisables (2 × 1 To en RAID 1) & 3,5 ans \\
 			Facteur de pic & pic $\div$ moyenne $= 1\,200 \div 12{,}7$ & $\times 95$ \\
 			\bottomrule
 		\end{tabularx}
 	\end{center}
 	
-	Le facteur de pic de 95 est la leçon de cette feuille : \textbf{nous dimensionnons sur le pic, pas sur la moyenne}. Ces chiffres pointent vers une architecture proportionnée : un seul Replica Set, sans sharding, sans Spark, sans Redis et sans Kafka au démarrage. Chaque composant écarté a un seuil de retour chiffré (annexe A, section 3), par exemple le sharding entre 490 et 600 M transactions par an sur des nœuds de 64 Go.
+	Le facteur de pic de 95 est la leçon de cette feuille : \textbf{nous dimensionnons sur le pic, pas sur la moyenne}. Ces chiffres pointent vers une architecture proportionnée : un seul Replica Set, sans sharding, sans Spark, sans Redis et sans Kafka au démarrage. Chaque composant écarté a un seuil de retour chiffré (annexe A, section 3), par exemple le sharding à 490 M transactions par an sur des nœuds de 64 Go.
 	
 	\textbf{Deux chiffres qui contredisent notre verdict, et ce que nous en faisons.}
 	\begin{itemize}
@@ -231,13 +233,13 @@
 	\section{Partie 1 · Modélisation (ADR-001)}
 	
 	\subsection{Un schéma qui rejette ce qui est faux}
-	Six collections portent un validateur \code{$jsonSchema} en \code{validationLevel: "strict"} et \code{validationAction: "error"} : \code{customers}, \code{wallets}, \code{merchants}, \code{transactions}, \code{ledger_entries} et \code{outbox}. Les montants sont des entiers (\code{int} ou \code{long}) : un franc CFA ne se divise pas, et un \code{double} introduirait des arrondis. Le validateur de \code{ledger_entries} utilise \code{oneOf} pour accepter les deux formes de ligne : une jambe de wallet (\code{walletId} et \code{balanceAfter} obligatoires) ou une jambe hors wallet (\code{walletId: null} et un compte \code{FEES}, \code{FLOAT}, \code{BILLER} ou \code{MERCHANT:M…}).
+	\sloppy Six collections portent un validateur \code{$jsonSchema} en \code{validationLevel: "strict"} et \code{validationAction: "error"} : \code{customers}, \code{wallets}, \code{merchants}, \code{transactions}, \code{ledger_entries} et \code{outbox}. Les montants sont des entiers (\code{int} ou \code{long}) : un franc CFA ne se divise pas, et un \code{double} introduirait des arrondis. Le validateur de \code{ledger_entries} utilise \code{oneOf} pour accepter les deux formes de ligne : une jambe de wallet (\code{walletId} et \code{balanceAfter} obligatoires) ou une jambe hors wallet (\code{walletId: null} et un compte \code{FEES}, \code{FLOAT}, \code{BILLER} ou \code{MERCHANT:M…}).
 	
 	Preuve (\preuve{01-validator-rejet.txt}) : nos 206 089 documents passent tous (0 invalide), et un document invalide est \textbf{rejeté dans chaque collection} avec le code 121 et son détail \code{errInfo} (par exemple \code{balance: 12.5} ou \code{kycLevel: 'trois'}).
 	
 	\subsection{Embarquer ou référencer : relation par relation}
 	\begin{center}\small
-		\begin{tabularx}{\linewidth}{@{}P{3.6cm}P{2.3cm}L@{}}
+		\begin{tabularx}{\linewidth}{@{}P{3.6cm}P{2.6cm}L@{}}
 			\toprule
 			\textbf{Relation} & \textbf{Choix} & \textbf{Justification mesurée} \\
 			\midrule
@@ -381,7 +383,7 @@
 		\item \textbf{Contrôles sans base :} montant entier strictement positif, stocké en \code{int} ou \code{long}.
 		\item \textbf{Rejeu :} si la clé existe déjà, la fonction renvoie le même \code{txId}, sans rien écrire.
 		\item \textbf{Transaction} en \code{w: "majority"} et lecture \code{snapshot} : d'abord le document \code{transactions} (l'index unique empêche deux virements pour une clé), puis le \textbf{débit conditionnel} (wallet \code{ACTIVE} et solde suffisant, vérifiés dans la même opération), le crédit, les deux lignes de ledger et l'événement \code{outbox}.
-		\item \textbf{Erreurs :} tout est annulé ; une clé en double (code 11000) devient un rejeu ; \code{TransientTransactionError} rejoue la transaction ; \code{UnknownTransactionCommitResult} redemande la validation.
+		\item \sloppy\textbf{Erreurs :} tout est annulé ; une clé en double (code 11000) devient un rejeu ; \code{TransientTransactionError} rejoue la transaction ; \code{UnknownTransactionCommitResult} redemande la validation.
 	\end{enumerate}
 	
 	\subsection{Ce que nos tests démontrent}
@@ -403,7 +405,7 @@
 	\textbf{L'abort, prouvé et pas seulement affirmé.} Avec \code{failAfterFirstWrite}, nous montrons trois choses : juste après la première écriture, le document est lu \textbf{dans} la transaction alors qu'une lecture \textbf{hors} de la transaction renvoie \code{null} ; le profileur du serveur a bien enregistré l'insertion, et le compteur d'annulations du serveur passe de 5 à 6 ; après \code{CRASH_SIMULATED}, le document a disparu et les soldes sont intacts.
 	
 	\subsection{Concurrence, et ce qui arrive sans transaction}
-	Deux clients partent à la même milliseconde et envoient chacun 25 virements de 100 FCFA depuis un wallet de 3 000 FCFA. \textbf{10 vérifications OK sur 10} (\preuve{04-concurrence.txt}) : exactement \textbf{30 virements acceptés} (19 + 11), 20 refus, solde final 0 et jamais négatif, monnaie conservée, ledger = 60 = 2 × 30, outbox = 30 ; MongoDB a signalé 6 conflits, tous rejoués par \code{transfer()}.
+	Deux clients partent à la même milliseconde et envoient chacun 25 virements de 100 FCFA depuis un wallet de 3 000 FCFA. \textbf{10 vérifications OK sur 10} (\preuve{04-concurrence.txt}) : exactement \textbf{30 virements acceptés} (17 + 13), 20 refus, solde final 0 et jamais négatif, monnaie conservée, ledger = 60 = 2 × 30, outbox = 30 ; MongoDB a signalé 9 conflits, tous rejoués par \code{transfer()}.
 	
 	Pour montrer ce que nos protections évitent, nous avons lancé la version qu'on écrirait spontanément : lire le solde, vérifier, réécrire, sans transaction ni condition (\preuve{04-lost-update.txt}). \textbf{Résultat : 50 débits acceptés au lieu de 30, 5 000 FCFA promis pour 2 500 FCFA réellement retirés.} C'est le « lost update » : deux clients lisent le même ancien solde, et un débit sur deux est perdu. C'est une des causes possibles des 6 soldes divergents de E1.
 	
@@ -438,7 +440,7 @@
 		\end{tabularx}
 	\end{center}
 	
-	\textbf{Pourquoi 21 s d'interruption pour 11 s d'élection ?} Nous avons formulé une hypothèse et l'avons testée : par défaut, le pilote ne vérifie l'état des nœuds que toutes les 10 s (\code{heartbeatFrequencyMS}), et continue donc à chercher l'ancien primary après l'élection. Avec une vérification par seconde, la première écriture passe 0,44 s après l'élection au lieu de 9,99 s, et \textbf{l'interruption est divisée par deux}. Une élection d'environ 10 s par mois consomme 0,8 \% du budget d'indisponibilité de 99,95 \% (21,6 minutes par mois).
+	\textbf{Pourquoi 21 s d'interruption pour 11 s d'élection ?} Nous avons formulé une hypothèse et l'avons testée : par défaut, le pilote ne vérifie l'état des nœuds que toutes les 10 s (\code{heartbeatFrequencyMS}), et continue donc à chercher l'ancien primary après l'élection. Avec une vérification par seconde, la première écriture passe 0,44 s après l'élection au lieu de 9,99 s, et \textbf{l'interruption est divisée par deux}. Ces durées ont été mesurées sur notre montage Docker, où les trois nœuds partagent une machine : elles dépendent du pilote et du réseau, et sont à remesurer sur le matériel cible. Une élection d'environ 10 s par mois consomme 0,8 \% du budget d'indisponibilité de 99,95 \% (21,6 minutes par mois).
 	
 	\textbf{Ce que \code{w: 1} fait perdre, et où MongoDB le range.} Coupé du réseau, l'ancien primary se croit encore primary pendant 10 s et \textbf{acquitte 97 écritures} que personne ne recopie. Rebranché, il découvre le nouveau primary et les annule (rollback). Le client a reçu « acquitté » pour chacune, et aucune n'est dans la base. MongoDB les range dans \code{/data/db/rollback/}, où nous retrouvons les 97 documents avec \code{bsondump} (\preuve{05-rollback.txt}) ; rien ne les réintègre automatiquement. En \code{w: "majority"}, ces écritures n'auraient jamais été acquittées : le client aurait su qu'elles n'étaient pas garanties et les aurait rejouées avec sa clé d'idempotence.
 	
@@ -465,7 +467,7 @@
 	\begin{center}\small
 		\begin{tabularx}{\linewidth}{@{}P{3.9cm}LLP{2.9cm}@{}}
 			\toprule
-			\textbf{Clé} & \textbf{Répartition des documents} & \textbf{Trafic du jour (shard 1 / 2 / 3)} & \textbf{Historique d'un wallet} \\
+			\textbf{Clé} & \textbf{Répartition des documents} & \textbf{Trafic du jour (shard 1 / 2 / 3)} & \textbf{Historique des envois d'un wallet} \\
 			\midrule
 			\code{{ createdAt: 1 }} & 1 chunk sur un shard, corrigé à la main & 0 / 0 / \textbf{100 \%} : hotspot & 3 shards \\
 			\code{{ fromWalletId: 1 }} & 1 chunk, corrigé à la main & 33 / 33 / 34 \% & 1 shard \\
@@ -482,9 +484,9 @@
 	
 	\textbf{Pourquoi la clé hachée sur l'émetteur est déséquilibrée.} Les 13 505 dépôts (\code{CASH_IN}, 22,5 \%) n'ont pas d'émetteur : ils ont tous la même valeur de clé, donc tombent dans le même chunk, qu'on ne peut pas découper. À la cible, cela ferait environ 90 millions de dépôts par an au même endroit. D'où notre clé \code{walletCle} : l'émetteur, ou le destinataire quand il n'y a pas d'émetteur. \textbf{0 document sans valeur de clé}, une répartition de 32 à 35 \% sans aucune correction.
 	
-	\textbf{Requêtes ciblées ou dispersées} (lu dans \code{explain()} à travers le mongos) : une requête n'est ciblée que si elle contient la clé. Avec \code{walletCle}, l'historique d'un wallet touche un seul shard (409 documents examinés pour 409 rendus) ; une transaction par \code{_id}, les paiements d'un marchand ou les transactions d'un jour interrogent les trois shards. Le CA par marchand est découpé : chaque shard fait un \code{$group} partiel (150 lignes au plus), et le mongos fusionne. \textbf{Le marchand qui fait 25 \% du volume} (M00044) se répartit sur les trois shards (31,8 / 32,5 / 35,7 \%), puisque ses paiements partent de wallets différents ; une clé sur \code{merchantId} aurait au contraire mis un quart des écritures sur une seule valeur.
+	\textbf{Requêtes ciblées ou dispersées} (lu dans \code{explain()} à travers le mongos) : une requête n'est ciblée que si elle contient la clé. Avec \code{walletCle}, l'historique d'un wallet touche un seul shard (409 documents examinés pour 409 rendus) ; une transaction par \code{_id}, les paiements d'un marchand ou les transactions d'un jour interrogent les trois shards. Attention : \code{walletCle} ne donne pas l'historique complet d'un wallet. Elle porte l'émetteur, et le destinataire seulement pour les dépôts : un virement reçu d'un autre wallet est rangé chez son émetteur. Pour W000612, la recherche par \code{walletCle} rend 409 transactions, alors que la requête \code{$or} émetteur / destinataire en rend 417 et interroge les trois shards (\code{SHARD_MERGE_SORT}). C'est le cas pour les cinq clés évaluées : une seule clé ne peut pas cibler à la fois l'émetteur et le destinataire. L'historique complet se lit déjà dans \code{ledger_entries}, qui a une ligne par wallet et l'index \code{{ walletId: 1, createdAt: -1 }} (Partie 3) : si cette lecture devenait critique, c'est cette collection que nous sharderions par \code{walletId}. Le CA par marchand est découpé : chaque shard fait un \code{$group} partiel (150 lignes au plus), et le mongos fusionne. \textbf{Le marchand qui fait 25 \% du volume} (M00044) se répartit sur les trois shards (31,8 / 32,5 / 35,7 \%), puisque ses paiements partent de wallets différents ; une clé sur \code{merchantId} aurait au contraire mis un quart des écritures sur une seule valeur.
 	
-	\textbf{Recommandation.} \textbf{Pas de sharding à 18 mois} (Partie 0) ; nous le déclencherons au premier de ces seuils : 490 à 600 M transactions par an sur des nœuds de 64 Go, 1 à 2 To par Replica Set, ou des écritures au-delà de 50 \% de la capacité du primary. \textbf{Ce jour-là, la clé sera \code{{ walletCle: "hashed" }}}, et nous ajoutons \code{walletCle} à chaque transaction \textbf{dès maintenant}, pour ne pas réécrire 400 millions de documents plus tard. Conséquence à préparer : sur une collection shardée, l'index unique d'idempotence doit commencer par la clé et deviendrait \code{{ walletCle: 1, idempotencyKey: 1 }}.
+	\textbf{Recommandation.} \textbf{Pas de sharding à 18 mois} (Partie 0) ; nous le déclencherons au premier de ces seuils : 490 M transactions par an sur des nœuds de 64 Go, 1 à 2 To par Replica Set, ou des écritures au-delà de 50 \% de la capacité du primary. \textbf{Ce jour-là, la clé sera \code{{ walletCle: "hashed" }}}, et nous ajoutons \code{walletCle} à chaque transaction \textbf{dès maintenant}, pour ne pas réécrire 400 millions de documents plus tard. Conséquence à préparer : sur une collection shardée, un index unique doit commencer par la clé de sharding ; l'index d'idempotence deviendrait \code{{ walletCle: 1, idempotencyKey: 1 }}. L'unicité ne vaudrait alors que pour un même wallet, et retrouver une clé sans connaître son wallet interrogerait les trois shards : le client devra toujours envoyer le wallet avec sa clé d'idempotence. Nous ne l'avons pas testé sur notre cluster.
 	
 	% =====================================================
 	% 9. PARTIE 7 : ARCHITECTURE
@@ -537,9 +539,9 @@
 			Sharding & 400 M tx/an, working set à 40 \% de la RAM & 490 M tx/an (working set à 50 \% de 64 Go), ou écritures au-delà de 50 \% du primary au test de charge \\
 			Kafka & un seul consommateur, servi par un Change Stream & un 2\textsuperscript{e} consommateur indépendant doit relire les événements au-delà de l'oplog, ou le relais prend plus de 60 s de retard au pic \\
 			Spark / Data Lake & 615 Mo par jour ; E3 en 23 ms & plus de 1 To à transformer par cycle, ou des sources hors MongoDB à croiser \\
-			Redis (solde) & 3 M soldes = 0,43 Go en cache, lecture en 0 ms médiane ; un cache créerait un second solde qui peut diverger & lecture de solde au-delà de 20 ms au p99 sous charge, ou plus de 20 000 lectures/s \\
+			Redis (solde) & 3 M soldes = 0,43 Go en cache, lecture par index unique en 0 ms médiane (Q3) ; un cache créerait un second solde qui peut diverger & lecture de solde au-delà de 20 ms au p99 sous charge, ou plus de 20 000 lectures/s \\
 			Lambda & pas de double besoin temps réel + recalcul lourd & les deux besoins à la fois \\
-			Nœuds de 128 Go & 27 octets par entrée d'index & index au-delà de 45 octets par entrée, ou working set au-delà de 60 \% de la RAM \\
+			Nœuds de 128 Go & 27 octets par entrée d'index & index au-delà de 45 octets par entrée, ou working set au-delà de 50 \% de la RAM \\
 			\bottomrule
 		\end{tabularx}
 	\end{center}
@@ -597,7 +599,7 @@
 		\item \textbf{Faire passer 100 \% des flux d'argent par \code{transfer()} (mois 1 à 3)}, avec une clé d'idempotence fixée par le client. C'est la réponse aux rejeux de l'incident du 10 avril : un seul débit pour 3 rejeux, 30 virements sur 50 en concurrence, jamais de solde négatif. \emph{Réussite :} 0 doublon, 0 solde négatif.
 		\item \textbf{Mettre en production le Replica Set sûr (mois 2 à 4) :} 3 nœuds de 64 Go sur des sites différents, \code{w: "majority"} pour l'argent, client réglé à 1 s, sauvegardes avec restauration \textbf{testée}, TLS, disques chiffrés et les trois rôles minimaux.
 		\item \textbf{Outiller la conformité et la finance (mois 3 à 6) :} alerte automatique sur le découpage sous le plafond (5 wallets aujourd'hui), read model pour le tableau de bord et les règlements, relais outbox pour les notifications ; consulter dès maintenant la CIL et intégrer les exigences de la BCEAO.
-		\item \textbf{Mesurer avant de grandir (mois 4 à 12) :} test de charge sur le matériel cible (il faut 2 400 virements/s, nous en mesurons 330 sur un portable), puis suivi mensuel des seuils : working set au-delà de 60 \% de la RAM, index au-delà de 45 octets par entrée, volume vers 490 M tx/an. La clé de sharding est déjà choisie.
+		\item \textbf{Mesurer avant de grandir (mois 4 à 12) :} test de charge sur le matériel cible (il faut 2 400 virements/s, nous en mesurons 330 sur un portable), puis suivi mensuel des seuils : working set au-delà de 50 \% de la RAM, index au-delà de 45 octets par entrée, volume vers 490 M tx/an. La clé de sharding est déjà choisie.
 	\end{enumerate}
 	
 	\textbf{Ce que nous ne ferons PAS}
@@ -608,7 +610,7 @@
 			\midrule
 			Kafka & un seul consommateur des événements & un 2\textsuperscript{e} consommateur doit les relire \\
 			Spark ou un Data Lake & 615 Mo nouveaux par jour, E3 en 23 ms & plus de 1 To par cycle \\
-			Redis devant les soldes & 0,43 Go en cache, lecture en 0 ms & p99 au-delà de 20 ms sous charge \\
+			Redis devant les soldes & 0,43 Go en cache, lecture par index unique en 0 ms (Q3) & p99 au-delà de 20 ms sous charge \\
 			Sharding & 400 M tx/an, working set à 40 \% de la RAM & 490 M tx/an ou test de charge insuffisant \\
 			Modifier ou supprimer le ledger & le ledger est la preuve de l'argent & jamais \\
 			Changer de base de données & MongoDB couvre transactions, réplication, Change Streams et agrégats, et tout notre POC tourne dessus & jamais sans mesure qui le justifie \\
@@ -672,7 +674,8 @@
 				Annexe B & Journal de montage \\[3pt]
 				Annexe C & Code \\[3pt]
 				Annexe D & Preuves \\[3pt]
-				Annexe E & Déclaration d'usage de l'IA \\
+				Annexe E & Déclaration d'usage de l'IA \\[3pt]
+				Annexe F & Contribution de chaque membre \\
 			\end{tabular}\par}
 	\end{center}
 	\vspace*{\fill}
@@ -749,9 +752,9 @@
 		Écritures/s au pic & 1 200 × 6 documents (1 transaction + 2 lignes de ledger + 2 soldes + 1 outbox, ADR-001) ; en plus 8 entrées d'index par virement (3 sur \texttt{transactions}, 4 sur \texttt{ledger\_entries}, 1 sur \texttt{outbox}) & 7 200 documents/s et 9 600 entrées d'index/s \\
 		Working set (30 jours chauds + index chauds) & 400 M × 30 / 365 = 32,88 M transactions × 561,02 o = 18,44 Go ; index chauds 18,44 × 0,3723 = 6,87 Go ; 3 M wallets × 144 o = 0,43 Go ; index des wallets 3 M × 55,3 o = 0,17 Go & 25,9 Go \\
 		RAM par nœud (cache WiredTiger ≈ 50 \% de (RAM − 1 Go)) & 50 \% × (RAM − 1) ≥ 25,9 donc RAM ≥ 2 × 25,9 + 1 = 52,8 Go : nœud de 64 Go (cache 31,5 Go, marge 22 \%) & 64 Go \\
-		Disque par nœud et horizon avant saturation & données sur disque : 224,4 Go × 0,5124 (compression mesurée : 17 248 256 / 33 661 042) = 115,0 Go ; index : 224,4 × 0,3723 = 83,5 Go ; total 198,5 Go/an ; disque utilisable : 2 To × 70 \% = 1 400 Go ; 1 400 / 198,5 & 7,1 ans \\
+		Disque par nœud et horizon avant saturation & données sur disque : 224,4 Go × 0,5124 (compression mesurée : 17 248 256 / 33 661 042) = 115,0 Go ; index : 224,4 × 0,3723 = 83,5 Go ; total 198,5 Go/an ; disque utilisable : 2 × 1 To en RAID 1 = 1 To, dont 70 \% = 700 Go ; 700 / 198,5 & 3,5 ans \\
 		Facteur de pic & moyenne : 400 M ÷ (365 × 86 400 s) = 12,7 tx/s ; pic ÷ moyenne = 1 200 ÷ 12,7 & ×95 : nous dimensionnons sur le pic, pas sur la moyenne \\
-		Rétention sur 5 ans & sur disque : 5 × 198,5 Go = 0,99 To ; non compressé, avec index : 5 × 307,9 Go = 1,54 To & tient sur 1,4 To utilisables pendant 7 ans, mais entre dans la zone de 1 à 2 To par Replica Set à partir de laquelle on envisage de répartir : nous archivons au-delà de 2 ans \\
+		Rétention sur 5 ans & sur disque : 5 × 198,5 Go = 0,99 To ; non compressé, avec index : 5 × 307,9 Go = 1,54 To & ne tient pas sur 700 Go utilisables, et entre dans la zone de 1 à 2 To par Replica Set à partir de laquelle on envisage de répartir : nous archivons au-delà de 2 ans (2 × 198,5 = 397 Go, soit 57 \% du disque) \\
 	\end{longtable}
 	
 	\subsection*{2 bis. Un chiffre qui contredit l'architecture : la taille des index}
@@ -785,7 +788,7 @@
 		Prudence haute (60 o) & 464 o & 15,3 Go & 34,3 Go & 69,6 Go : \textbf{64 Go ne suffit plus} \\
 	\end{longtable}
 	
-	Le nœud de 64 Go tient tant que les index restent sous \textbf{49 octets par entrée} : au-delà, le working set dépasse le cache de 31,5 Go. Nous gardons donc 64 Go comme base, avec un seuil de surveillance : si les index dépassent 45 octets par entrée en production, ou si le working set dépasse 60 \% de la RAM, nous passons à des nœuds de 128 Go. C'est une montée en gamme, pas un sharding.
+	Le nœud de 64 Go tient tant que les index restent sous \textbf{49 octets par entrée} : au-delà, le working set dépasse le cache de 31,5 Go. Nous gardons donc 64 Go comme base, avec un seuil de surveillance : si les index dépassent 45 octets par entrée en production, ou si le working set dépasse 50 \% de la RAM, nous passons à des nœuds de 128 Go. C'est une montée en gamme, pas un sharding.
 	
 	\subsection*{2 ter. Un deuxième chiffre qui contredit : le débit mesuré}
 	
@@ -813,11 +816,11 @@
 		\endhead
 		\bottomrule\noalign{}
 		\endlastfoot
-		Un seul replica set suffit-il ? & Oui à 18 mois : 0,31 To par an non compressé (sous la zone de 1 à 2 To) ; working set de 25,9 Go sur 64 Go, soit 40 \% de la RAM (54 \% dans l'hypothèse prudente de la section 2 bis) ; pour les 7 200 écritures par seconde au pic, nous avons mesuré 330 virements/s sur un portable (section 2 ter) : le critère n'est pas encore vérifié sur le matériel cible. & Working set au-delà de 60 \% de la RAM ; ou plus de 1 à 2 To par replica set ; ou écritures au-delà de 50 \% du débit du primary, mesuré par un test de charge sur le matériel cible (il faut au moins 2 400 virements/s). \\
-		Sharding ? & Non : aucun des trois critères n'est franchi à 18 mois. Nous ne le déclencherons que sur cette feuille et un test de charge. & Sur des nœuds de 64 Go : entre 490 M tx/an (working set à 50 \% de la RAM) et 600 M tx/an (60 \%). En volume : 1 To non compressé atteint en 3,2 ans, 2 To en 6,5 ans. \\
+		Un seul replica set suffit-il ? & Oui à 18 mois : 0,31 To par an non compressé (sous la zone de 1 à 2 To) ; working set de 25,9 Go sur 64 Go, soit 40 \% de la RAM (54 \% dans l'hypothèse prudente de la section 2 bis) ; pour les 7 200 écritures par seconde au pic, nous avons mesuré 330 virements/s sur un portable (section 2 ter) : le critère n'est pas encore vérifié sur le matériel cible. & Working set au-delà de 50 \% de la RAM ; ou plus de 1 à 2 To par replica set ; ou écritures au-delà de 50 \% du débit du primary, mesuré par un test de charge sur le matériel cible (il faut au moins 2 400 virements/s). \\
+		Sharding ? & Non : aucun des trois critères n'est franchi à 18 mois. Nous ne le déclencherons que sur cette feuille et un test de charge. & Sur des nœuds de 64 Go : 490 M tx/an, quand le working set atteint 50 \% de la RAM, soit la taille du cache. En volume : 1 To non compressé atteint en 3,2 ans, 2 To en 6,5 ans. \\
 		Kafka ? & Non au démarrage : un seul consommateur des événements \texttt{outbox} (le relais de notifications), qu'un Change Stream avec jeton de reprise suffit à servir. & Dès qu'un \textbf{deuxième consommateur indépendant} doit relire les événements au-delà de la fenêtre de l'oplog (par exemple la détection de fraude ou la comptabilité), ou qu'il faut un tampon devant le pic. Probable à la cible : nous le tranchons en Partie 7. \\
 		Spark / Data Lake ? & Non : 224,4 Go de données par an, soit environ 615 Mo par jour ; un \texttt{\$merge} quotidien vers un read model suffit. E3 prend 23 ms sur le POC (\texttt{03-explain.txt}). & Plusieurs To à transformer par cycle, ou des sources hétérogènes hors MongoDB (opérateurs télécom, banques partenaires). \\
-		Redis pour le solde ? & Non : les 3 M soldes pèsent 0,43 Go et tiennent dans le cache ; une lecture exacte par index prend 0 ms en médiane (Q3, \texttt{03-explain.txt}). Nous n'ajoutons pas de cache sans mesure qui le justifie. & Une lecture de solde au-delà de 20 ms au p99, mesurée sous charge, ou plus de 20 000 lectures de solde par seconde soutenues. \\
+		Redis pour le solde ? & Non : les 3 M soldes pèsent 0,43 Go et tiennent dans le cache ; une lecture par index unique, comme celle d'un solde par \texttt{\_id}, prend 0 ms en médiane (Q3, \texttt{03-explain.txt}). Nous n'ajoutons pas de cache sans mesure qui le justifie. & Une lecture de solde au-delà de 20 ms au p99, mesurée sous charge, ou plus de 20 000 lectures de solde par seconde soutenues. \\
 		Lambda ? & Non : nous n'avons pas de besoin cumulé de temps réel \textbf{et} de recalcul historique lourd. & Les deux besoins à la fois, sans qu'un seul moteur puisse les servir. \\
 	\end{longtable}
 	
@@ -831,7 +834,7 @@
 	\textbf{Non testées :}
 	4. Unités décimales : 1 Mo = 10⁶ octets, 1 Go = 10⁹ octets.
 	5. Fenêtre chaude de 30 jours, trafic réparti sur l'année (30 / 365 du volume annuel). Un pic de 2 h chaque 1er du mois représenterait 8,64 M transactions par mois, soit 26 \% du volume : nous supposons qu'il reste dans le mois chaud.
-	6. Nœud de référence : 64 Go de RAM, disque de 2 To dont 70 \% utilisables ; l'oplog n'est pas compté.
+	6. Nœud de référence : 64 Go de RAM, deux disques de 1 To en RAID 1 (1 To), dont 70 \% utilisables, soit 700 Go ; l'oplog n'est pas compté.
 	7. Les 3 M wallets sont tous dans le working set ; \texttt{customers} (0,46 Go) et \texttt{merchants} (0,013 Go) n'y sont pas.
 	8. Les documents \texttt{outbox} sont supprimés après envoi : ils n'entrent pas dans le volume annuel (un document pèse 109 octets, mesuré).
 	9. Volume constant de 400 M tx/an ; archivage des données de plus de 2 ans.
@@ -953,10 +956,12 @@
 		db.merchants.aggregate([{$group: {_id: {mcc: {$type: "$mcc"}, feePct: {$type: "$feePct"}, location: {$type: "$location"}, createdAt: {$type: "$createdAt"}}, n: {$sum: 1}}}])
 	\end{lstlisting}
 	\subsection*{12. Validateurs de la Partie 1}
+	Commandes tapées dans la session : \code{code/01-validateurs.js}.
 	\begin{lstlisting}
 		docker exec -it mongo-rs1 mongosh fasopay_tp
 	\end{lstlisting}
 	\subsection*{13. Mesures pour la modélisation (Partie 1)}
+	Commandes tapées dans la session : \code{code/01-mesures-modelisation.js}.
 	\begin{lstlisting}
 		docker exec -it mongo-rs1 mongosh fasopay_tp
 	\end{lstlisting}
@@ -964,6 +969,7 @@
 		docker exec -it mongo-rs1 mongosh fasopay_tp
 	\end{lstlisting}
 	\subsection*{14. Enquête (Partie 2)}
+	Commandes tapées dans la session : \code{code/02-enquete.js}.
 	\begin{lstlisting}
 		docker exec -it mongo-rs1 mongosh fasopay_tp
 	\end{lstlisting}
@@ -984,6 +990,7 @@
 		db.getSiblingDB("fasopay_audit").dropDatabase()
 	\end{lstlisting}
 	\subsection*{15. Index et explain (Partie 3)}
+	Commandes tapées dans la session : \code{code/03-index.js}.
 	\begin{lstlisting}
 		docker exec -it mongo-rs1 mongosh fasopay_tp
 	\end{lstlisting}
@@ -1000,6 +1007,7 @@
 		db.transactions.dropIndex("idx_refuse_ca_marchand")
 	\end{lstlisting}
 	\subsection*{16. Mesures de dimensionnement (Partie 0)}
+	Commandes tapées dans la session : \code{code/00-dimensionnement.js}.
 	\begin{lstlisting}
 		docker exec -it mongo-rs1 mongosh fasopay_tp
 	\end{lstlisting}
@@ -1164,12 +1172,12 @@
 	\markboth{Annexe C · Code}{}
 	Tous nos scripts sont dans le dossier \texttt{code/} du ZIP : les fichiers \texttt{.js} se lancent dans \texttt{mongosh}, les fichiers \texttt{.sh} dans un conteneur, et chacun écrit sa preuve (commande, date, sortie brute).
 	\begin{center}\small
-		\begin{tabularx}{\linewidth}{@{}P{4.4cm}LP{1.2cm}@{}}
+		\begin{tabularx}{\linewidth}{@{}P{4.9cm}LP{1.2cm}@{}}
 			\toprule
 			\textbf{Fichier} & \textbf{Rôle} & \textbf{Partie} \\
 			\midrule
 			\code{00-dimensionnement.js} & mesures de dimensionnement, en lecture seule & 0 \\
-			\code{01-validateurs.js}, \code{01-mesures-modelisation.js} & validateurs, tests de rejet, mesures de modélisation & 1 \\
+			\code{01-validateurs.js},\newline \code{01-mesures-modelisation.js} & validateurs, tests de rejet, mesures de modélisation & 1 \\
 			\code{02-enquete.js} & pipelines E1 à E4, commentés & 2 \\
 			\code{03-index.js} & index et \code{explain()} avant / après & 3 \\
 			\code{transfer.js} & \textbf{la fonction \code{transfer()}}, au contrat de l'énoncé & 4 \\
@@ -1215,5 +1223,31 @@
 		\item \textbf{Partie 6.} Le script proposé comptait les documents de chaque shard avec \code{$collStats}, qui compte aussi les orphelins laissés après un \code{sh.moveChunk} : nos preuves affichaient 100 000 documents au lieu de 60 000. Nous l'avons repéré en relisant les chiffres, puis mesuré la vraie répartition avec \code{$shardedDataDistribution} (\preuve{06-orphelins.txt}).
 		\item \textbf{Partie 7.} Le script de sécurité supposait que \code{getRoles} renvoie un simple tableau, ce qui n'est pas le cas dans mongosh 2.14.0 (\code{TypeError: b.getRoles(...).map is not a function}). Nous l'avons fait corriger et avons refait toute la preuve (\preuve{07-securite.txt}).
 	\end{enumerate}
+	
+	\clearpage
+	\section*{Annexe F · Contribution de chaque membre}
+	\addcontentsline{toc}{section}{Annexe F · Contribution de chaque membre}
+	\markboth{Annexe F · Contribution de chaque membre}{}
+	Nous avons travaillé à deux sur un seul poste : toutes les commandes ont été exécutées sur la machine de ZONGO Abdrafith, ce qui explique que les preuves portent toutes le même chemin. Chaque partie a un responsable, qui a préparé les commandes et rédigé le texte ; l'autre membre a relu les chiffres contre les preuves.
+	\begin{center}\small
+		\begin{tabularx}{\linewidth}{@{}LP{3.4cm}P{3.4cm}@{}}
+			\toprule
+			\textbf{Partie} & \textbf{Responsable} & \textbf{Relecture} \\
+			\midrule
+			D1 à D4 : serveur, import, vérification du fingerprint & ZONGO Abdrafith & YAMEOGO Joseph \\
+			Partie 0 : dimensionnement (annexe A) & YAMEOGO Joseph & ZONGO Abdrafith \\
+			Partie 1 : modélisation, validateurs, ADR-001 & YAMEOGO Joseph & ZONGO Abdrafith \\
+			Partie 2 : enquête E1 à E4 & ZONGO Abdrafith & YAMEOGO Joseph \\
+			Partie 3 : index et explain & ZONGO Abdrafith & YAMEOGO Joseph \\
+			Partie 4 : \code{transfer.js} et ses tests & ZONGO Abdrafith & YAMEOGO Joseph \\
+			Partie 5 : Replica Set à 3 nœuds, pannes, ADR-002 & ZONGO Abdrafith & YAMEOGO Joseph \\
+			Partie 6 : cluster shardé, clés & YAMEOGO Joseph & ZONGO Abdrafith \\
+			Partie 7 : architecture, coût, sécurité, ADR-003 & YAMEOGO Joseph & ZONGO Abdrafith \\
+			Synthèse CTO et conclusion & les deux & les deux \\
+			Bonus B2 : relais outbox & ZONGO Abdrafith & YAMEOGO Joseph \\
+			Journal de montage, mise en forme \LaTeX{}, dépôt Git & ZONGO Abdrafith & YAMEOGO Joseph \\
+			\bottomrule
+		\end{tabularx}
+	\end{center}
 	
 \end{document}
