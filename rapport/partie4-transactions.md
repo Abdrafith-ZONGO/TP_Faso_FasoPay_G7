@@ -2,6 +2,8 @@
 
 > Brouillon de la section 6 du rapport. Code : `code/transfer.js` et nos tests (`code/04-*.js`, lancés par `code/04-lancer.sh`) ; sorties brutes : `preuves/04-transaction.txt`, `preuves/04-concurrence.txt`, `preuves/04-lost-update.txt`.
 
+C'est le cœur de la demande du CTO : un virement ne doit jamais être exécuté deux fois, ni à moitié. Un virement touche six documents ; si une panne survient entre deux écritures, ou si deux virements partent du même wallet au même moment, de l'argent peut disparaître ou être créé. Nous avons écrit la fonction `transfer()` pour l'empêcher, puis nous l'avons mise à l'épreuve avec nos propres tests : rejeux, refus, panne provoquée et clients simultanés.
+
 ## 4.1 Où se font les tests
 Tous les tests tournent sur une base dédiée, `fasopay_test`, recréée à chaque lancement par `code/04-base-test.js`. La base `fasopay_tp` n'est jamais modifiée : nos chiffres des parties 0 à 3 restent ceux du `fingerprint.json`. La base de test reçoit les mêmes validateurs que `fasopay_tp` (Partie 1) et l'index unique sur `transactions.idempotencyKey` (Partie 3) : les documents écrits par `transfer()` doivent donc respecter notre schéma.
 
@@ -73,7 +75,9 @@ Une transaction multi-documents garantit le « tout ou rien » : les 6 écriture
 
 Trois mécanismes complètent la transaction :
 - **La clé d'idempotence**, protégée par un index unique. Le réessai porte la même clé ; il est reconnu et reçoit la réponse du premier virement, avec le même `txId`, sans second débit. C'est ce que montre notre test « réponse perdue », et c'est ce qui a protégé les 65 rejeux de l'incident du 10 avril (E4).
-- **Les écritures rejouables** (retryable writes, activées par défaut par les pilotes MongoDB) : une opération simple interrompue par une coupure ou une élection est renvoyée automatiquement une fois, et le serveur reconnaît qu'il l'a déjà appliquée.
+- **Les retryable writes** (écritures rejouables, activées par défaut par les drivers MongoDB) : une opération simple interrompue par une coupure ou une élection est renvoyée automatiquement une fois, et le serveur reconnaît qu'il l'a déjà appliquée.
 - **Les deux étiquettes d'erreur des transactions**, que `transfer()` traite explicitement. `TransientTransactionError` : la transaction a échoué sans rien appliquer (conflit, élection) ; on peut la rejouer entièrement. `UnknownTransactionCommitResult` : la validation a peut-être abouti ; on redemande la validation elle-même, que le serveur n'applique qu'une fois.
 
 Ce qu'aucun de ces mécanismes ne fait : protéger un client qui réessaie avec une **nouvelle** clé. La clé doit donc être fixée par le client (l'application ou le terminal USSD) avant le premier envoi, et réutilisée à chaque réessai.
+
+**À retenir.** `transfer()` écrit tout ou rien, ne compte jamais deux fois un virement rejoué et garde les soldes justes quand plusieurs clients débitent le même wallet en même temps. La version sans ces protections, elle, accepte 50 débits au lieu de 30.

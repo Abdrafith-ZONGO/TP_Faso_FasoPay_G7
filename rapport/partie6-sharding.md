@@ -2,6 +2,8 @@
 
 > Brouillon de la section 8 du rapport. Montage : journal, section 19 ; code : `code/06-lancer.sh`, `code/06-cles.js` ; preuves : `preuves/06-cluster.txt`, `preuves/06-cle-*.txt`, `preuves/06-orphelins*.txt`.
 
+Quand les données ou les écritures deviennent trop nombreuses pour un seul Replica Set, on les répartit sur plusieurs serveurs : c'est le sharding. Tout dépend alors de la shard key, le champ qui décide où va chaque transaction : une mauvaise clé envoie tout le trafic sur un seul serveur. Nous avons monté un vrai cluster, essayé cinq clés sur nos données, et regardé où tombent les transactions et ce que coûtent les recherches.
+
 ## 6.1 Le cluster
 Nous avons monté un cluster shardé complet, pièce par pièce : un config server (`rs-cfg`, Replica Set `--configsvr`), trois shards (`rs-shard1` à `rs-shard3`, chacun un Replica Set `--shardsvr` d'un nœud) et un routeur `mongos` relié au config server ; les shards sont déclarés par `sh.addShard`. `config.shards` liste les trois shards, et `sh.status()` montre un mongos actif et le balancer activé (`preuves/06-cluster.txt`). Toutes les pièces tournent sur la même machine : le banc mesure la répartition et le routage, pas la performance d'un vrai cluster.
 
@@ -46,7 +48,7 @@ Pour chaque clé candidate, une collection de la base `fasopay_shard` est shard�
 
 La clé `wallet` répartit bien le trafic aujourd'hui, mais par chance : nos points de découpe tombent au tiers des données. Deux faiblesses restent. Les nouveaux wallets reçoivent des identifiants croissants (`W002001`, ...) et iront tous dans le dernier chunk ; et les dépôts, tous sur la même valeur de clé, forment un chunk **qu'on ne peut pas découper** (un chunk se découpe entre deux valeurs de clé différentes). À la cible, 22,5 % de 400 millions de transactions, soit environ 90 millions de dépôts par an, s'accumuleraient dans ce chunk. La clé `hash` a le même défaut (48 % du trafic sur un shard), et la clé `composee` le déplace seulement : les dépôts deviennent découpables grâce à la date, mais arrivent toujours au même endroit, en fin de plage.
 
-## 6.5 Requêtes ciblées ou dispersées
+## 6.5 Requêtes ciblées ou scatter-gather
 Nombre de shards interrogés, lu dans `explain()` à travers le mongos (`SINGLE_SHARD` = un shard ; `SHARD_MERGE` ou `SHARD_MERGE_SORT` = tous, avec fusion par le mongos) :
 
 | Requête | `date` | `wallet` | `hash` | `composee` | `cible` |
@@ -62,7 +64,7 @@ Nombre de shards interrogés, lu dans `explain()` à travers le mongos (`SINGLE_
 **Attention :** `walletCle` ne donne pas l'historique complet d'un wallet. Elle porte l'émetteur, et le destinataire seulement pour les dépôts : un virement reçu d'un autre wallet est rangé chez son émetteur. Pour W000612, la recherche par `walletCle` rend 409 transactions, alors que la requête `$or` émetteur / destinataire en rend 417 et interroge les trois shards (`SHARD_MERGE_SORT`). C'est le cas pour les cinq clés évaluées : une seule clé ne peut pas cibler à la fois l'émetteur et le destinataire. L'historique complet se lit déjà dans `ledger_entries`, qui a une ligne par wallet et l'index `{ walletId: 1, createdAt: -1 }` (Partie 3) : si cette lecture devenait critique, c'est cette collection que nous sharderions par `walletId`.
 | CA par marchand (agrégation) | 3 | 3 | 3 | 3 | 3 |
 
-Une requête n'est ciblée que si elle contient la clé de sharding : la clé `date` cible les requêtes par période, les clés par wallet ciblent l'historique d'un wallet. Avec la clé `cible`, l'historique par `fromWalletId` redevient dispersé : l'application doit interroger par `walletCle` (409 documents examinés pour 409 rendus, sur un seul shard). La recherche par `_id` est dispersée avec toutes les clés, mais chaque shard n'examine que 0 ou 1 document grâce à l'index `_id` : le coût est un aller-retour de plus par shard, pas un parcours.
+Une requête n'est ciblée que si elle contient la shard key : la clé `date` cible les requêtes par période, les clés par wallet ciblent l'historique d'un wallet. Avec la clé `cible`, l'historique par `fromWalletId` redevient dispersé : l'application doit interroger par `walletCle` (409 documents examinés pour 409 rendus, sur un seul shard). La recherche par `_id` part en scatter-gather avec toutes les clés, mais chaque shard n'examine que 0 ou 1 document grâce à l'index `_id` : le coût est un aller-retour de plus par shard, pas un parcours.
 
 **Le CA par marchand.** L'agrégation est découpée en deux : chaque shard exécute `$match` puis un `$group` partiel sur ses propres documents (150 marchands au plus par shard) ; le mongos fusionne les résultats partiels (`$mergeCursors`), additionne les sommes de chaque marchand (`$group` final) et trie (`$sort`) ; `mergeType` vaut `mongos`. Chaque shard ne renvoie donc qu'environ 150 lignes, et non ses milliers de paiements.
 
@@ -75,7 +77,9 @@ Avec une clé par wallet, les paiements de M00044 partent de wallets différents
 **2. Quand ce seuil sera atteint, la clé sera `{ walletCle: "hashed" }`**, avec `walletCle` = `fromWalletId`, ou `toWalletId` quand il n'y a pas d'émetteur. Mesuré : 0 document sans valeur de clé, une répartition de 32 à 35 % par shard sans aucune correction, un trafic du jour réparti de la même façon, et l'historique d'un wallet ciblé sur un seul shard. Elle garde les qualités de la clé `hash` sans son défaut (47 % sur un shard), et évite le hotspot de la clé `date` (100 %).
 
 **3. Ce que nous faisons dès maintenant.** Ajouter le champ `walletCle` à chaque transaction écrite (`transfer()` et les autres flux), pour que le sharding, le jour venu, ne demande pas de réécrire 400 millions de documents. Deux conséquences sont à préparer :
-- **L'index unique d'idempotence.** Sur une collection shardée, un index unique doit commencer par la clé de sharding ; l'index d'idempotence deviendrait `{ walletCle: 1, idempotencyKey: 1 }`. L'unicité ne vaudrait alors que pour un même wallet, et retrouver une clé sans connaître son wallet interrogerait les trois shards : le client devra toujours envoyer le wallet avec sa clé d'idempotence. Nous ne l'avons pas testé sur notre cluster.
-- **Les lectures dispersées** (par `_id`, par marchand, par jour) restent possibles mais interrogent tous les shards : les lectures fréquentes de ce type passeront par un read model (Partie 7).
+- **L'index unique d'idempotence.** Sur une collection shardée, un index unique doit commencer par la shard key ; l'index d'idempotence deviendrait `{ walletCle: 1, idempotencyKey: 1 }`. L'unicité ne vaudrait alors que pour un même wallet, et retrouver une clé sans connaître son wallet interrogerait les trois shards : le client devra toujours envoyer le wallet avec sa clé d'idempotence. Nous ne l'avons pas testé sur notre cluster.
+- **Les lectures scatter-gather** (par `_id`, par marchand, par jour) restent possibles mais interrogent tous les shards : les lectures fréquentes de ce type passeront par un read model (Partie 7).
 
 **Ce que nos mesures ne montrent pas.** Trois shards d'un nœud sur une même machine et 60 000 transactions : le banc démontre la répartition et le routage, pas le débit. Avec 2 000 wallets, quelques wallets très actifs pèsent encore sur la répartition (35,2 % sur un shard) ; avec 3 millions de wallets, le hachage la lissera davantage. Enfin, la clé `cible` répartit un wallet actif sur un seul shard : un wallet très actif (un agent qui fait des milliers d'opérations par jour) resterait sur un shard, ce que nous surveillerons.
+
+**À retenir.** FasoPay n'a pas besoin de sharding à 18 mois. Le jour où il le faudra, la clé `{ walletCle: "hashed" }` répartit les transactions, y compris celles du jour, de façon presque égale sur les trois shards, et garde l'historique des envois d'un wallet sur un seul shard.

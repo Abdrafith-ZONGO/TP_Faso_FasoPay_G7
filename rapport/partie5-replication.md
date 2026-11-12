@@ -2,6 +2,8 @@
 
 > Brouillon de la section 7 du rapport. Montage : journal, section 18 ; code : `code/05-lancer.sh`, `code/05-boucle.js` ; preuves : `preuves/05-rs-status.txt`, `preuves/05-failover.txt`.
 
+Un seul serveur ne suffit pas pour de l'argent : s'il tombe en panne, plus aucun virement n'est possible, et les écritures récentes peuvent être perdues. Un Replica Set garde plusieurs copies des données sur des serveurs différents, et en choisit un nouveau chef si le premier tombe. Nous avons monté trois serveurs, provoqué de vraies pannes pendant que des écritures tournaient, puis compté ce qui a été perdu.
+
 ## 5.1 Le Replica Set à trois nœuds
 Nous avons monté un second environnement, distinct de `mongo-rs1` qui garde `fasopay_tp` : le Replica Set `rs-fasopay`, avec trois nœuds (`fasopay-noeud1` à `fasopay-noeud3`), chacun dans son conteneur, avec son propre volume, sur le réseau Docker `reseau-fasopay`. Chaque nœud a un cache limité à 0,25 Go pour tenir dans la mémoire de notre machine. Les noms désignent un nœud et non un rôle : après une panne, le primary change de nœud.
 
@@ -24,10 +26,10 @@ Le client écrit pendant 90 s, une écriture toutes les 100 ms, avec `w: "majori
 
 **Lecture.** L'élection prend 11,3 s : un nœud attend 10 s sans nouvelles du primary (`electionTimeoutMillis`) avant de se présenter, puis le vote est rapide. Les 10 écritures échouées sont des erreurs de sélection de serveur : pendant ce temps, le client n'a pas de primary où écrire, et nous avons réglé son attente à 2 s pour que l'interruption soit visible dans le journal. Aucune écriture acquittée n'est perdue : chacune était sur deux nœuds au moment de l'acquittement, donc présente sur le nœud élu. Les écritures n° 92 et 93 sont acquittées juste après l'heure notée : `docker kill` prend quelques dizaines de millisecondes à arrêter le conteneur.
 
-L'interruption totale (21,2 s) est près du double du temps d'élection (11,3 s) : pendant environ 10 s après l'élection, le client échoue encore alors qu'un nouveau primary existe. La section 5.3 en donne la cause, mesurée. Ces durées ont été mesurées sur notre montage Docker, où les trois nœuds partagent une machine : elles dépendent du pilote et du réseau, et sont à remesurer sur le matériel cible.
+L'interruption totale (21,2 s) est près du double du temps d'élection (11,3 s) : pendant environ 10 s après l'élection, le client échoue encore alors qu'un nouveau primary existe. La section 5.3 en donne la cause, mesurée. Ces durées ont été mesurées sur notre montage Docker, où les trois nœuds partagent une machine : elles dépendent du driver et du réseau, et sont à remesurer sur le matériel cible.
 
 ## 5.3 D'où viennent les 10 secondes de trop ?
-Notre hypothèse : par défaut, le pilote du client ne vérifie l'état des nœuds que toutes les 10 s (`heartbeatFrequencyMS`). Après l'élection, il continue donc à chercher l'ancien primary jusqu'à sa vérification suivante. Pour le vérifier, nous avons refait exactement la même panne (`docker kill` du primary, alors `fasopay-noeud3`), avec un client réglé à une vérification par seconde (`preuves/05-failover-hb1.txt`).
+Notre hypothèse : par défaut, le driver du client ne vérifie l'état des nœuds que toutes les 10 s (`heartbeatFrequencyMS`). Après l'élection, il continue donc à chercher l'ancien primary jusqu'à sa vérification suivante. Pour le vérifier, nous avons refait exactement la même panne (`docker kill` du primary, alors `fasopay-noeud3`), avec un client réglé à une vérification par seconde (`preuves/05-failover-hb1.txt`).
 
 | | Client par défaut (10 s) | Client réglé à 1 s |
 |---|---|---|
@@ -69,3 +71,4 @@ Le client est réglé avec `retryWrites=true` et `heartbeatFrequencyMS=1000`, ce
 ## 5.6 Nos virements sur trois nœuds
 Les tests de la Partie 4 avaient tourné sur un nœud unique, où `w: "majority"` équivaut à `w: 1`. Nous les avons rejoués sur `rs-fasopay`, où la majorité d'écriture vaut 2 (`preuves/04-transaction-rs3.txt`, `preuves/04-concurrence-rs3.txt`) : 36 vérifications OK sur 36 pour le contrat de `transfer()` (succès, rejeux, refus, abort prouvé, réponse perdue), et 10 sur 10 pour la concurrence (30 virements acceptés sur 50, solde final 0 jamais négatif, monnaie conservée, ledger = 60, outbox = 30, 5 conflits rejoués). La garantie de majorité ne change donc rien au comportement de `transfer()`, et elle lui ajoute la résistance à la perte d'un nœud mesurée dans les sections 5.2 à 5.4.
 
+**À retenir.** avec trois nœuds et `w: "majority"`, une panne coupe les écritures une dizaine de secondes mais ne perd aucune écriture confirmée ; avec `w: 1`, une coupure semblable en a perdu 97. Pour l'argent, nous choisissons la sûreté.

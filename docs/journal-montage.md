@@ -803,7 +803,7 @@ Résultat : 637 écritures tentées, 627 acquittées, 10 échouées (erreurs de 
 
 ### 18.4 Même panne, client qui surveille les nœuds toutes les secondes
 
-Objectif : vérifier pourquoi l'interruption (21,2 s) a duré près du double de l'élection (11,3 s). Hypothèse : le pilote du client ne vérifie l'état des nœuds que toutes les 10 s par défaut (`heartbeatFrequencyMS`) et découvre donc le nouveau primary avec retard. Même test, avec `heartbeatFrequencyMS=1000` ajouté à la chaîne de connexion (mode `majority-hb1` de `05-lancer.sh`) ; le primary était alors `fasopay-noeud3`.
+Objectif : vérifier pourquoi l'interruption (21,2 s) a duré près du double de l'élection (11,3 s). Hypothèse : le driver du client ne vérifie l'état des nœuds que toutes les 10 s par défaut (`heartbeatFrequencyMS`) et découvre donc le nouveau primary avec retard. Même test, avec `heartbeatFrequencyMS=1000` ajouté à la chaîne de connexion (mode `majority-hb1` de `05-lancer.sh`) ; le primary était alors `fasopay-noeud3`.
 
 ```powershell
 docker cp code/. fasopay-client:/tmp/code/
@@ -1057,10 +1057,10 @@ docker exec mongo-rs1 sh /tmp/code/B2-lancer.sh relais
 docker cp mongo-rs1:/tmp/preuves/B2-relais-outbox.txt preuves/B2-relais-outbox.txt
 ```
 
-Le relais, pour chaque événement, dans cet ordre : (1) il écrit la notification avec le même `_id` que l'événement (`updateOne` avec `upsert` et `$setOnInsert`) ; (2) il passe l'événement à `SENT` ; (3) il sauvegarde le jeton de reprise dans `relais_etat`. Le filtre `{ operationType: "insert", "fullDocument.status": "PENDING" }` est appliqué par le serveur. Au premier démarrage, le relais sauvegarde tout de suite un jeton, pour ne rien perdre s'il meurt avant son premier événement.
+Le relais, pour chaque événement, dans cet ordre : (1) il écrit la notification avec le même `_id` que l'événement (`updateOne` avec `upsert` et `$setOnInsert`) ; (2) il passe l'événement à `SENT` ; (3) il sauvegarde le resume token dans `relais_etat`. Le filtre `{ operationType: "insert", "fullDocument.status": "PENDING" }` est appliqué par le serveur. Au premier démarrage, le relais sauvegarde tout de suite un resume token, pour ne rien perdre s'il meurt avant son premier événement.
 
 Résultat :
-- **Scénario 1** (`kill -9` au milieu de 1 000 virements) : le relais n° 1 est tué à 00:59:34 ; pendant les 3 s qui suivent, la rafale continue et 410 événements s'accumulent en `PENDING`. Le relais n° 2 reprend avec `resumeAfter` « après 323 événements traités » et reconnaît **1 relivraison** : l'événement 324 avait déjà sa notification et son `SENT`, mais le `kill -9` est tombé avant la sauvegarde du jeton. Vérifications : 1 000 événements, 1 000 notifications, 0 perdu, 0 doublon (6 OK sur 6).
-- **Scénario 2** (arrêt volontaire juste après la 5e notification, avant `SENT` et avant le jeton) : le relais n° 3 sort avec le code 9 ; à cet instant, 1 005 notifications pour 1 004 événements `SENT`. Le relais n° 4 reprend et reconnaît **1 relivraison** du même événement, sans doublon. Vérifications sur les 1 020 virements : 1 020 événements, 1 020 notifications, 0 perdu, 0 doublon (6 OK sur 6).
+- **Scénario 1** (`kill -9` au milieu de 1 000 virements) : le relais n° 1 est tué à 00:59:34 ; pendant les 3 s qui suivent, la rafale continue et 410 événements s'accumulent en `PENDING`. Le relais n° 2 reprend avec `resumeAfter` « après 323 événements traités » et reconnaît **1 relivraison** : l'événement 324 avait déjà sa notification et son `SENT`, mais le `kill -9` est tombé avant la sauvegarde du resume token. Vérifications : 1 000 événements, 1 000 notifications, 0 perdu, 0 doublon (6 OK sur 6).
+- **Scénario 2** (arrêt volontaire juste après la 5e notification, avant `SENT` et avant le resume token) : le relais n° 3 sort avec le code 9 ; à cet instant, 1 005 notifications pour 1 004 événements `SENT`. Le relais n° 4 reprend et reconnaît **1 relivraison** du même événement, sans doublon. Vérifications sur les 1 020 virements : 1 020 événements, 1 020 notifications, 0 perdu, 0 doublon (6 OK sur 6).
 
 Preuve : `preuves/B2-relais-outbox.txt` (date `Tue Nov 10 00:59:26 UTC 2026`).

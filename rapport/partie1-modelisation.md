@@ -2,6 +2,8 @@
 
 > Brouillon pour la section 3 du rapport. Tous les chiffres viennent de `preuves/01-validator-rejet.txt` et `preuves/01-mesures-modelisation.txt` (mesurés sur `fasopay_tp`, groupe 07).
 
+Un modèle de données décide de ce que la base accepte, de la façon dont les informations sont rangées et de ce que coûte chaque lecture. Pour FasoPay, il doit surtout protéger l'argent : refuser un montant faux, garder la trace de chaque mouvement et permettre de retrouver un solde contesté. Nous présentons d'abord les règles que la base impose à chaque document, puis, relation par relation, notre choix entre l'embedding, qui range une information dans le document qui l'utilise, et le referencing, qui la range dans une autre collection, et enfin le grand livre qui garde la trace de l'argent.
+
 ## 1.1 Schéma et validation
 
 Sept collections dans `fasopay_tp` : `customers`, `wallets`, `merchants`, `transactions`, `ledger_entries` (importées), `outbox` et `fraud_alerts` (créées vides). Six d'entre elles portent un validateur `$jsonSchema` avec `validationLevel: "strict"` et `validationAction: "error"` : `customers`, `wallets`, `merchants`, `transactions`, `ledger_entries`, `outbox`. `fraud_alerts` n'a pas de validateur à ce stade : elle reste vide.
@@ -29,16 +31,16 @@ Preuves (`01-validator-rejet.txt`) :
 
 Le validateur de `ledger_entries` utilise `oneOf` : soit une jambe de wallet (`walletId` en chaîne, `balanceAfter` obligatoire, pas de `account`), soit une jambe hors wallet (`walletId: null`, `account` obligatoire, pas de `balanceAfter`). Il accepte ainsi les 71 885 jambes avec wallet et les 70 054 sans.
 
-## 1.2 Embed, référence ou hybride, relation par relation
+## 1.2 Embedding, referencing ou hybride, relation par relation
 
 | Relation | Choix | Access pattern | Justification (chiffres) |
 |---|---|---|---|
-| client ↔ wallet | Référence (`wallets.customerId`) | AP1, AP2 | 1 wallet par client (2000 clients, 2000 wallets). Un virement lit et écrit le wallet sans toucher au client : le wallet change à chaque transaction, le client presque jamais. |
-| wallet ↔ transactions | Référence | AP1 | 1939 wallets émettent des transactions, 23,98 en moyenne, maximum 319 ; une transaction concerne deux wallets, elle ne peut pas appartenir à un seul. |
-| transaction ↔ ledger | Référence (collection séparée) | AP1, AP3, AP4 | 2 à 6 lignes par transaction (2 : 28 111 ; 3 : 28 093 ; 4 : 121 ; 6 : 159). Le virement écrit les lignes (AP1), l'historique les relit par wallet (AP3) : le ledger est append-only et se lit par wallet, pas seulement par transaction. |
-| marchand ↔ transactions | Référence | lecture marchand (hors des 4 prioritaires) | 150 marchands, 17 989 paiements, 119,9 en moyenne, maximum 4 479 (24,9 % des paiements marchands) : on les lit par marchand et par période. |
-| transaction ↔ `attempts` | Embed | AP1 (le rejeu) | Les rejeux d'une même clé se lisent avec la transaction ; seulement 21 transactions en ont, liste courte. |
-| transaction ↔ `flags`, marchand ↔ `location` | Embed | aucun dédié | Petits, bornés, toujours lus avec leur document. |
+| client ↔ wallet | Referencing (`wallets.customerId`) | AP1, AP2 | 1 wallet par client (2000 clients, 2000 wallets). Un virement lit et écrit le wallet sans toucher au client : le wallet change à chaque transaction, le client presque jamais. |
+| wallet ↔ transactions | Referencing | AP1 | 1939 wallets émettent des transactions, 23,98 en moyenne, maximum 319 ; une transaction concerne deux wallets, elle ne peut pas appartenir à un seul. |
+| transaction ↔ ledger | Referencing (collection séparée) | AP1, AP3, AP4 | 2 à 6 lignes par transaction (2 : 28 111 ; 3 : 28 093 ; 4 : 121 ; 6 : 159). Le virement écrit les lignes (AP1), l'historique les relit par wallet (AP3) : le ledger est append-only et se lit par wallet, pas seulement par transaction. |
+| marchand ↔ transactions | Referencing | lecture marchand (hors des 4 prioritaires) | 150 marchands, 17 989 paiements, 119,9 en moyenne, maximum 4 479 (24,9 % des paiements marchands) : on les lit par marchand et par période. |
+| transaction ↔ `attempts` | Embedding | AP1 (le rejeu) | Les rejeux d'une même clé se lisent avec la transaction ; seulement 21 transactions en ont, liste courte. |
+| transaction ↔ `flags`, marchand ↔ `location` | Embedding | aucun dédié | Petits, bornés, toujours lus avec leur document. |
 | ledger ↔ solde (`balanceAfter`) | Hybride (copie) | AP3, AP4 | Chaque jambe de wallet garde une copie du solde après l'opération : l'historique du wallet se reconstitue sans tout recalculer. |
 
 ## 1.3 Quatre access patterns, par priorité (fréquence × criticité)
@@ -80,3 +82,5 @@ Le modèle applique les cinq règles d'un grand livre en partie double :
 ## 1.6 ADR-001
 
 Voir `adr/ADR-001.md` : « Un transfert écrit combien de documents ? ».
+
+**À retenir.** la base refuse désormais les documents faux, chaque mouvement d'argent est écrit deux fois dans un journal qui ne s'efface jamais, et un virement écrit ses 6 documents ensemble ou pas du tout.

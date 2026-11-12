@@ -1,6 +1,8 @@
 # 9. Partie 7 · Architecture proportionnée (+ ADR-003)
 
-> Diagramme : `rapport/diagramme-architecture.png` (source PlantUML : `rapport/diagramme-architecture.puml`). Chiffres : Partie 0 et annexe A ; preuves citées entre parenthèses.
+> Diagramme : `rapport/diagramme-architecture.png`. Chiffres : Partie 0 et annexe A ; preuves citées entre parenthèses.
+
+Le CTO veut une architecture qui tienne la cible « sans acheter une usine à gaz ». Nous partons donc de nos chiffres, et non des outils à la mode : chaque composant retenu est justifié par une mesure, et chaque composant écarté a un seuil chiffré qui le ferait revenir. Nous terminons par la sécurité, le coût et la décision d'architecture (ADR-003).
 
 ## 9.1 Notre cible : PME (un Replica Set et un read model)
 
@@ -11,7 +13,7 @@ Nous déclarons la cible **PME**. Ce sont nos chiffres de la Partie 0 qui la fix
 | Disponibilité exigée | 99,95 %, RPO de 0 pour l'argent | **Startup** : un serveur seul ne survit pas à sa propre panne, et les transactions multi-documents demandent un Replica Set (Partie 4). Nous avons mesuré 0 écriture `majority` perdue sur panne du primary (`preuves/05-failover.txt`), ce qu'un nœud seul ne peut pas offrir. |
 | Working set | 25,9 Go, soit 40 % de 64 Go (54 % dans l'hypothèse prudente) | **Enterprise** : il tient dans le cache d'un seul nœud de 64 Go (31,5 Go de cache). |
 | Volume | 224,4 Go de données par an, 307,9 Go avec les index | **Enterprise** : loin de la zone de 1 à 2 To par Replica Set ; 1 To non compressé n'est atteint qu'en 3,2 ans. |
-| Débit au pic | 1 200 tx/s, soit 7 200 écritures de documents/s | Un seul primary peut suffire, **à condition** de le vérifier par un test de charge (330 virements/s mesurés sur notre portable, 2 400 nécessaires : annexe A, section 2 ter). |
+| Débit au pic | 1 200 tx/s, soit 7 200 écritures de documents/s | Un seul primary peut suffire, **à condition** de le vérifier par un test de charge (330 virements/s mesurés sur notre ordinateur portable, 2 400 nécessaires : annexe A, section 2 ter). |
 | Seuil de sharding | 490 M tx/an sur des nœuds de 64 Go | **Enterprise** : nous sommes à 400 M tx/an ; le sharding n'est pas nécessaire à 18 mois (Partie 6). |
 
 Le tableau de bord et les règlements marchands ont besoin d'agrégats (chiffre d'affaires par marchand) qui ne doivent pas peser sur le primary : c'est le **read model**, la deuxième moitié de la cible PME.
@@ -34,7 +36,7 @@ Ce diagramme ne contient que les composants de la cible : ni Kafka, ni Spark, ni
 | **`transfer()` avec clé d'idempotence** | Incident du 10/04 : **21 clés** rejouées et des paiements en double chez un marchand (E4). Nos tests : 3 rejeux, 1 seul débit ; 2 clients en concurrence, exactement 30 virements acceptés sur 50, solde jamais négatif. | `02-enquete.txt`, `04-transaction.txt`, `04-concurrence.txt` |
 | **Client avec `heartbeatFrequencyMS=1000` et `retryWrites`** | Interruption d'écriture ramenée de **21,2 s à 10,6 s** pendant une élection, sans perte. | `05-failover-hb1.txt` |
 | **Read model `ca_marchands`** (`$merge` quotidien, lu sur un secondary) | 224,4 Go par an, soit environ 615 Mo de données nouvelles par jour : un `$merge` par jour suffit. Un agrégat lu en direct sur le primary consommerait la capacité la plus fragile du dimensionnement (330 virements/s mesurés pour 2 400 nécessaires). E3 prend 23 ms sur le POC. | `03-explain.txt`, `04-debit.txt` |
-| **Relais outbox par Change Stream** | Un seul consommateur des événements (les notifications) : un Change Stream avec jeton de reprise suffit (bonus B2). Sans outbox, une notification peut partir pour un virement annulé, ou se perdre. | annexe A, section 3 |
+| **Relais outbox par Change Stream** | Un seul consommateur des événements (les notifications) : un Change Stream avec resume token suffit (bonus B2). Sans outbox, une notification peut partir pour un virement annulé, ou se perdre. | annexe A, section 3 |
 | **Rapprochement nocturne ledger / soldes** | **6 soldes incohérents**, pour un écart absolu de 138 000 FCFA, trouvés par E1. La finance doit voir le prochain écart le lendemain, pas par une plainte du support. | `02-enquete.txt` |
 | **Alertes plafond vers `fraud_alerts`** | E2 trouve **5 wallets** qui découpent leurs transferts sous le plafond journalier. | `02-enquete.txt` |
 | **Sauvegardes hors des nœuds** (Storage Box, restauration à un instant donné) | Le Replica Set protège contre la panne d'un nœud, pas contre une erreur humaine : une suppression faite sur le primary est répliquée sur les secondaries en quelques millisecondes. Il faut une copie quotidienne et l'oplog pour revenir à l'instant qui précède l'erreur. | Partie 5 |
@@ -46,7 +48,7 @@ Ce diagramme ne contient que les composants de la cible : ni Kafka, ni Spark, ni
 | Composant | Pourquoi pas aujourd'hui (nos chiffres) | Nous le réintroduisons quand… |
 |---|---|---|
 | **Sharding** | 400 M tx/an ; working set à 40 % de la RAM ; 0,31 To par an non compressé. Si un jour il faut sharder, la clé est prête : `{ walletCle: "hashed" }` (Partie 6). | le volume dépasse **490 M tx/an** (working set à 50 % de la RAM sur 64 Go, soit la taille du cache) ; **ou** le test de charge montre que les écritures dépassent **50 % du débit du primary** même après une montée en gamme. |
-| **Kafka** | Un seul consommateur des événements (le relais de notifications), servi par un Change Stream avec jeton de reprise. Kafka ajouterait un cluster de plus à exploiter (au moins 3 nœuds) pour un seul lecteur. | un **deuxième consommateur indépendant** (détection de fraude en temps réel, comptabilité) doit relire les événements au-delà de la fenêtre de l'oplog ; **ou** le relais prend plus de **60 s de retard** au pic de 1 200 tx/s. |
+| **Kafka** | Un seul consommateur des événements (le relais de notifications), servi par un Change Stream avec resume token. Kafka ajouterait un cluster de plus à exploiter (au moins 3 nœuds) pour un seul lecteur. | un **deuxième consommateur indépendant** (détection de fraude en temps réel, comptabilité) doit relire les événements au-delà de la fenêtre de l'oplog ; **ou** le relais prend plus de **60 s de retard** au pic de 1 200 tx/s. |
 | **Spark / Data Lake** | Environ 615 Mo de données nouvelles par jour ; le `$merge` quotidien suffit et E3 prend 23 ms. | plus de **1 To à transformer par cycle** de calcul, **ou** des sources hors MongoDB à croiser (relevés des opérateurs télécom, des banques partenaires). |
 | **Redis pour le solde** | Les 3 M soldes pèsent 0,43 Go et tiennent dans le cache ; une lecture par index unique, comme celle d'un solde par `_id`, prend 0 ms en médiane (Q3). Un cache ajouterait un risque : un solde affiché différent du solde réel, ce qui est justement la plainte du support. | une lecture de solde au-delà de **20 ms au p99** sous charge, **ou** plus de **20 000 lectures de solde par seconde** soutenues. |
 | **Architecture Lambda** | Pas de besoin cumulé de temps réel et de recalcul historique lourd : le Change Stream couvre le temps réel, le `$merge` le recalcul. | les deux besoins à la fois, sans qu'un seul moteur puisse les servir. |
@@ -101,6 +103,8 @@ Une seule fois : frais d'installation des 3 EX63, 3 × 74 € = **222 €, soit 
 ## 9.7 ADR-003
 
 Voir `adr/ADR-003.md` : *Cible PME : un Replica Set de 3 nœuds et un read model, sans Kafka, Spark, Redis ni sharding à 18 mois.*
+
+**À retenir.** trois serveurs de 64 Go, un read model et un relais suffisent à la cible, pour environ 483 € HT par mois. Kafka, Spark, Redis et le sharding sont écartés aujourd'hui, chacun avec le chiffre qui le ferait revenir.
 
 ## Sources
 - MongoDB, *Encryption at Rest* (édition Enterprise seulement) : https://www.mongodb.com/docs/manual/core/security-encryption-at-rest/

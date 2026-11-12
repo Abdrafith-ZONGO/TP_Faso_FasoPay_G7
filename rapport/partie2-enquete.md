@@ -2,7 +2,11 @@
 
 > Brouillon de la section 4 du rapport. Les chiffres viennent de `preuves/02-enquete.txt` ; les pipelines commentés sont dans `code/02-enquete.js`.
 
+Le CTO nous pose quatre questions sur des problèmes réels : des soldes contestés, des clients qui contourneraient leur plafond, la concentration du chiffre d'affaires et des paiements en double. Pour y répondre, nous interrogeons directement nos données, et chaque réponse est chiffrée et vérifiable.
+
 ## E1 : wallets dont le solde ne colle pas au ledger
+
+La finance dit que « le ledger ne colle pas aux soldes ». Si c'est vrai, le solde stocké dans certains wallets doit être différent du total de leurs mouvements dans le ledger : c'est ce que nous cherchons.
 
 **Question du CTO.** Quels wallets ont un `balance` différent de la somme signée de leur `ledger_entries` ? Combien, et quel écart total ?
 
@@ -29,6 +33,8 @@ L'écart n'est pas un « faux positif d'ouverture » : les soldes initiaux sont 
 **Ce que cela implique.** C'est le risque décrit en Partie 1 : le solde est un cache du ledger, et un cache écrit hors de la transaction qui écrit le ledger diverge. Deux conséquences. D'abord, tout changement de solde doit passer par `transfer.js` (Partie 4), qui écrit ledger et solde ensemble. Ensuite, un contrôle de rapprochement (le pipeline E1) devrait tourner régulièrement. Pour corriger les 6 wallets, on passerait par des écritures d'ajustement dans le ledger plutôt que par une modification directe du solde, afin de garder la trace. E1 détecte les écarts, mais ne dit ni quand ni comment ils sont apparus.
 
 ## E2 : clients qui découpent leurs transferts sous le plafond
+
+La conformité soupçonne des clients de découper leurs transferts en plusieurs montants juste sous leur plafond journalier. Il faut d'abord définir ce qu'est un découpage, puis chercher les wallets qui correspondent.
 
 **Question du CTO.** Quels clients « découpent » leurs transferts pour passer sous le plafond journalier ?
 
@@ -73,6 +79,8 @@ Sept transactions en moins de 3 heures, espacées de 21 à 41 minutes, chacune e
 
 ## E3 : marchands qui concentrent le chiffre d'affaires
 
+Le CTO veut savoir si quelques marchands font l'essentiel du chiffre d'affaires : cela change les priorités commerciales, et la façon de répartir les données (Partie 6).
+
 **Question du CTO.** Quels marchands concentrent le CA ? Le top 20 % fait-il 80 % ?
 
 **Définition du CA.** CA d'un marchand = somme des `amount` de ses transactions `MERCHANT_PAY` au statut `COMPLETED`. Les `FAILED` (1 243 paiements, 22 883 125) et `PENDING` (13, 242 250) n'ont rien encaissé ; les `REVERSED` (130, 1 822 900) sont des remboursements ; `fee` est la commission de FasoPay, pas le CA du marchand. En comptant tous les statuts, le total serait 253 998 800 (+10,9 %) : la définition change le chiffre, d'où la nécessité de la fixer.
@@ -103,6 +111,8 @@ Courbe de Pareto (part cumulée du CA selon la part des marchands) :
 
 ## E4 : clés d'idempotence rejouées et incident
 
+Pendant une coupure réseau, un client qui ne reçoit pas de réponse renvoie sa demande avec la même clé d'idempotence. Nous cherchons ces demandes renvoyées et vérifions qu'aucune n'a produit un second paiement.
+
 **Question du CTO.** Quelles `idempotencyKey` ont été rejouées, avec quels écarts de montant ou de statut ? Y a-t-il eu un incident (fenêtre horaire) ?
 
 **Méthode.** Le tableau `attempts` d'une transaction garde chaque tentative : la première est `PROCESSED`, les suivantes `REPLAYED`. `$match` d'abord (21 transactions sur 60 000), `$project` pour compter tentatives, traitées et rejeux, puis `$unwind` pour analyser les tentatives par jour et par heure.
@@ -129,3 +139,5 @@ Courbe de Pareto (part cumulée du CA selon la part des marchands) :
 | E2 | 5 wallets, 23 couples wallet-jour, 121 transactions entre 90 % et 100 % du plafond ; aucune transaction ne dépasse le plafond à elle seule |
 | E3 | CA marchand 229 050 525 ; le top 20 % (30 marchands) fait 81,96 % ; M00130 seul fait 27,21 % |
 | E4 | 21 clés rejouées, 65 rejeux, aucun doublon ; incident le 2026-04-10 de 14:09 à 15:36 UTC (10 clés) |
+
+**À retenir.** l'argent n'a pas été doublé dans nos données, mais 6 soldes ont divergé du ledger : le risque principal est un chemin d'écriture qui modifie le solde hors de la transaction qui écrit le ledger.

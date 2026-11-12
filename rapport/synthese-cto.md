@@ -1,5 +1,7 @@
 # 10. Synthèse CTO : 5 priorités pour les 12 prochains mois
 
+Cette page résume le rapport pour le CTO : ce qu'il faut faire dans les 12 prochains mois, dans l'ordre, et ce qu'il ne faut pas faire.
+
 **Notre verdict en une phrase :** FasoPay n'a pas besoin d'une plateforme de données, mais d'un Replica Set de 3 nœuds bien réglé, d'un `transfer()` utilisé partout et d'un contrôle quotidien de l'argent ; coût indicatif **483,37 € HT par mois, soit environ 317 070 FCFA**.
 
 ## Les 5 priorités, dans l'ordre
@@ -17,7 +19,7 @@ Une seule transaction pour la transaction, les deux lignes de ledger, les soldes
 Alerte automatique dans `fraud_alerts` pour les découpages sous le plafond journalier (E2 : 5 wallets aujourd'hui) ; read model `ca_marchands` pour le tableau de bord et les règlements, lu sur un secondary ; relais outbox pour les notifications. Consulter dès maintenant la **CIL** (serveurs hors du Burkina Faso) et intégrer les exigences de la **BCEAO**.
 
 **5. Mesurer avant de grandir (mois 4 à 12).**
-Test de charge sur le matériel cible avant la mise en production : il faut **2 400 virements/s** sur le primary, nous en avons mesuré 330 sur un portable. Puis suivre chaque mois les seuils qui déclenchent la suite : working set au-delà de 50 % de la RAM, index au-delà de 45 octets par entrée, volume vers 490 M tx/an. La clé de sharding est déjà choisie (`{ walletCle: "hashed" }`) : le jour venu, nous saurons quoi faire.
+Test de charge sur le matériel cible avant la mise en production : il faut **2 400 virements/s** sur le primary, nous en avons mesuré 330 sur notre ordinateur portable. Puis suivre chaque mois les seuils qui déclenchent la suite : working set au-delà de 50 % de la RAM, index au-delà de 45 octets par entrée, volume vers 490 M tx/an. La shard key est déjà choisie (`{ walletCle: "hashed" }`) : le jour venu, nous saurons quoi faire.
 
 ## Ce que nous ne ferons PAS
 

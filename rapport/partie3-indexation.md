@@ -2,6 +2,8 @@
 
 > Brouillon de la section 5 du rapport. Les chiffres viennent de `preuves/03-explain.txt` ; les commandes sont dans `code/03-index.js`.
 
+Sans index, MongoDB doit lire toute une collection pour trouver quelques documents : sur 60 000 transactions, cela reste rapide, mais à 400 millions par an, chaque recherche deviendrait un parcours complet. Un index joue le rôle d'un sommaire trié : il mène directement aux bons documents. En contrepartie, chaque écriture doit aussi mettre le sommaire à jour, ce qui ralentit les virements. Nous avons donc choisi les trois recherches dont FasoPay a le plus besoin, mesuré leur coût avant et après index, et refusé un index qui coûtait plus qu'il ne rapportait.
+
 ## Choix des requêtes critiques
 Les deux requêtes viennent de l'audit de la Partie 2 :
 - **Q1 : sorties du jour d'un wallet** (cas W000758 du 30 janvier 2026, E2). E2 a montré que 5 wallets dépassent leur plafond journalier en cumulé alors qu'aucune transaction ne le dépasse seule : détecter ce cumul demande la somme des sorties `COMPLETED` d'un wallet sur la journée. C'est une requête de conformité, hors de `transfer.js` : le contrat de la Partie 4 n'autorise pas de refus pour plafond, donc le contrôle est séparé et alimente `fraud_alerts`.
@@ -60,3 +62,5 @@ L'index **aide** : E3 devient environ 2,6 fois plus rapide, avec un gain de 14 m
 Nous le réintroduirions si E3 devenait une lecture fréquente en direct (un tableau de bord interrogé en continu) sans read model possible. Après la mesure, `getIndexes()` ne liste plus que `_id_`, `idx_sorties_wallet_jour` et `uniq_idempotency_key`.
 
 Un second index jugé inutile, non mesuré : `{ status: 1 }` seul. Avec 56 204 transactions `COMPLETED` sur 60 000 (93,7 %, E3), il ne sélectionnerait presque rien et coûterait une entrée par écriture.
+
+**À retenir.** avec trois index, les recherches les plus fréquentes passent d'une lecture complète de la collection (60 000 ou 141 939 documents) à 0 ou 1 document lu. Nous n'avons pas indexé tout ce qui pouvait l'être : chaque index ralentit les virements, et nous n'avons gardé que ceux qui servent l'argent.
